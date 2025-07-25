@@ -1,0 +1,57 @@
+{
+  "name": "@avorati/strapi-provider-upload-minio",
+  "version": "1.0.1",
+  "description": "MinIO provider for Strapi Upload",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev": "tsc --watch",
+    "test": "jest"
+  },
+  "keywords": [
+    "strapi",
+    "upload",
+    "minio",
+    "s3",
+    "storage",
+    "provider"
+  ],
+  "author": "Seu Nome <seu.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avorati/strapi-provider-upload-minio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/avorati/strapi-provider-upload-minio/issues"
+  },
+  "homepage": "https://github.com/avorati/strapi-provider-upload-minio#readme",
+  "dependencies": {
+    "minio": "^8.0.1"
+  },
+  "peerDependencies": {
+    "@strapi/strapi": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.0.0",
+    "jest-mock": "^30.0.2",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=6.0.0"
+  },
+  "strapi": {
+    "displayName": "MinIO",
+    "description": "Upload files to MinIO S3-compatible storage",
+    "kind": "provider",
+    "name": "strapi-provider-upload-minio"
+  }
+}
