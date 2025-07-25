@@ -23,21 +23,15 @@ jobs:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
         options: --health-cmd "curl -f http://localhost:9000/minio/health/live" --health-interval 10s --health-timeout 5s --health-retries 3
-        command: server /data
+        # Removed the 'command' field because it is not supported by GitHub Actions
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-
     - name: Install dependencies
       run: npm ci
 
-    - name: Run linting
+    - name: Run lint
       run: npm run lint --if-present
 
     - name: Build project
@@ -70,6 +64,7 @@ jobs:
       with:
         node-version: '20.x'
         registry-url: 'https://registry.npmjs.org'
+        scope: '@avorati'
 
     - name: Install dependencies
       run: npm ci
@@ -77,8 +72,7 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: Semantic Release
+    - name: Publish to NPM
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: npx semantic-release
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: npm publish --access public
