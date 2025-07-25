@@ -118,19 +118,18 @@ jobs:
         CURRENT_VERSION=$(node -p "require('./package.json').version")
         echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
         
-        # Verificar se a versão já existe no NPM
-        if yarn info @avorati/strapi-provider-upload-minio@$CURRENT_VERSION > /dev/null 2>&1; then
+        # Obter a lista de versões publicadas
+        VERSIONS=$(yarn info @avorati/strapi-provider-upload-minio versions --json 2>/dev/null | jq -r '.data | join(",")')
+        
+        if [ -z "$VERSIONS" ]; then
+          echo "version_exists=false" >> $GITHUB_OUTPUT
+          echo "ℹ️ Pacote nunca publicado no NPM, será publicado agora"
+        elif echo "$VERSIONS" | grep -q "$CURRENT_VERSION"; then
           echo "version_exists=true" >> $GITHUB_OUTPUT
           echo "⚠️ Version $CURRENT_VERSION already exists on NPM"
         else
-          # Tentar buscar o pacote sem a versão para ver se o pacote existe
-          if yarn info @avorati/strapi-provider-upload-minio > /dev/null 2>&1; then
-            echo "version_exists=false" >> $GITHUB_OUTPUT
-            echo "✅ Version $CURRENT_VERSION is new"
-          else
-            echo "version_exists=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ Pacote nunca publicado no NPM, será publicado agora"
-          fi
+          echo "version_exists=false" >> $GITHUB_OUTPUT
+          echo "✅ Version $CURRENT_VERSION is new"
         fi
 
     - name: Publish to NPM
