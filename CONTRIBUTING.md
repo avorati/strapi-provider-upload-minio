@@ -1,70 +1,70 @@
-# Guia de Contribuição
+# Contribution Guide
 
-Obrigado por seu interesse em contribuir com o Strapi MinIO Provider! 🎉
+Thank you for your interest in contributing to the Strapi MinIO Provider! 🎉
 
-## 📋 Sumário
+## 📋 Table of Contents
 
-- [Código de Conduta](#código-de-conduta)
-- [Como Contribuir](#como-contribuir)
-- [Configuração do Ambiente](#configuração-do-ambiente)
-- [Executando Testes](#executando-testes)
-- [Enviando Pull Requests](#enviando-pull-requests)
-- [Convenções de Código](#convenções-de-código)
-- [Versionamento](#versionamento)
+- [Code of Conduct](#code-of-conduct)
+- [How to Contribute](#how-to-contribute)
+- [Environment Setup](#environment-setup)
+- [Running Tests](#running-tests)
+- [Submitting Pull Requests](#submitting-pull-requests)
+- [Code Conventions](#code-conventions)
+- [Versioning](#versioning)
 
-## 📜 Código de Conduta
+## 📝 Code of Conduct
 
-Este projeto segue o [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/). Ao participar, você se compromete a seguir este código.
+This project follows the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/). By participating, you agree to abide by this code.
 
-## 🤝 Como Contribuir
+## 🤝 How to Contribute
 
-### Reportando Bugs
+### Reporting Bugs
 
-1. Verifique se o bug já foi reportado nas [Issues](https://github.com/seu-usuario/strapi-provider-upload-minio/issues)
-2. Se não encontrou, crie uma nova issue com:
-   - Título claro e descritivo
-   - Descrição detalhada do problema
-   - Passos para reproduzir
-   - Versões do Strapi, Node.js e MinIO
-   - Screenshots/logs quando aplicável
+1. Check if the bug has already been reported in the [Issues](https://github.com/seu-usuario/strapi-provider-upload-minio/issues)
+2. If not found, create a new issue with:
+   - Clear and descriptive title
+   - Detailed description of the problem
+   - Steps to reproduce
+   - Versions of Strapi, Node.js, and MinIO
+   - Screenshots/logs when applicable
 
-### Sugerindo Melhorias
+### Suggesting Improvements
 
-1. Abra uma issue descrevendo:
-   - A funcionalidade desejada
-   - Por que seria útil
-   - Como deveria funcionar
-   - Exemplos de uso
+1. Open an issue describing:
+   - The desired feature
+   - Why it would be useful
+   - How it should work
+   - Usage examples
 
-### Contribuindo com Código
+### Contributing Code
 
-1. Fork o repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/amazing-feature`)
-3. Faça suas alterações
-4. Execute os testes
-5. Commit suas mudanças
-6. Push para a branch
-7. Abra um Pull Request
+1. Fork the repository
+2. Create a branch for your feature (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run the tests
+5. Commit your changes
+6. Push to the branch
+7. Open a Pull Request
 
-## 🛠 Configuração do Ambiente
+## 🛠️ Environment Setup
 
-### Pré-requisitos
+### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm 6+
-- Docker (para MinIO local)
+- Docker (for local MinIO)
 
-### Instalação
+### Installation
 
 ```bash
-# Clone o repositório
+# Clone the repository
 git clone https://github.com/seu-usuario/strapi-provider-upload-minio.git
 cd strapi-provider-upload-minio
 
-# Instale dependências
+# Install dependencies
 npm install
 
-# Configure MinIO local com Docker
+# Set up local MinIO with Docker
 docker run -d \
   -p 9000:9000 \
   -p 9001:9001 \
@@ -73,9 +73,9 @@ docker run -d \
   minio/minio server /data --console-address ":9001"
 ```
 
-### Configuração de Ambiente
+### Environment Configuration
 
-Crie um arquivo `.env` na raiz do projeto:
+Create a `.env` file at the project root:
 
 ```env
 MINIO_ENDPOINT=localhost
@@ -86,16 +86,16 @@ MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=test-bucket
 ```
 
-## 🧪 Executando Testes
+## 🧪 Running Tests
 
 ```bash
-# Executar todos os testes
+# Run all tests
 npm test
 
-# Executar testes em modo watch
+# Run tests in watch mode
 npm test -- --watch
 
-# Executar testes com cobertura
+# Run tests with coverage
 npm test -- --coverage
 
 # Linting
@@ -105,72 +105,72 @@ npm run lint
 npm run build
 ```
 
-## 📝 Enviando Pull Requests
+## 📝 Submitting Pull Requests
 
-### Antes de Enviar
+### Before Submitting
 
-- [ ] Todos os testes passando
-- [ ] Código segue as convenções
-- [ ] Documentação atualizada
-- [ ] Commits seguem padrão conventional
+- [ ] All tests passing
+- [ ] Code follows conventions
+- [ ] Documentation updated
+- [ ] Commits follow conventional standard
 
-### Template de PR
+### PR Template
 
 ```markdown
-## 📝 Descrição
+## 📝 Description
 
-Breve descrição das mudanças realizadas.
+Brief description of the changes made.
 
-## 🔧 Tipo de Mudança
+## 🔧 Type of Change
 
-- [ ] Bug fix (mudança que corrige um problema)
-- [ ] Nova funcionalidade (mudança que adiciona funcionalidade)
-- [ ] Breaking change (mudança que quebra compatibilidade)
-- [ ] Documentação (mudança apenas na documentação)
+- [ ] Bug fix (fixes a problem)
+- [ ] New feature (adds functionality)
+- [ ] Breaking change (breaking compatibility)
+- [ ] Documentation (documentation only)
 
 ## ✅ Checklist
 
-- [ ] Testes passando
-- [ ] Linting sem erros
-- [ ] Documentação atualizada
-- [ ] CHANGELOG.md atualizado (se necessário)
+- [ ] Tests passing
+- [ ] Linting without errors
+- [ ] Documentation updated
+- [ ] CHANGELOG.md updated (if necessary)
 
-## 🧪 Como Testar
+## 🧪 How to Test
 
-Instruções para testar as mudanças...
+Instructions to test the changes...
 ```
 
-## 📏 Convenções de Código
+## 📏 Code Conventions
 
 ### TypeScript
 
-- Use TypeScript para todo o código
-- Defina tipos explícitos quando necessário
-- Evite `any`, prefira tipos específicos
+- Use TypeScript for all code
+- Define explicit types when necessary
+- Avoid `any`, prefer specific types
 
-### Formatação
+### Formatting
 
 ```bash
-# Formatação automática
+# Automatic formatting
 npm run format
 
-# Verificar formatação
+# Check formatting
 npm run format:check
 ```
 
-### Nomenclatura
+### Naming
 
-- **Variáveis/Funções**: camelCase (`fileName`, `uploadFile`)
+- **Variables/Functions**: camelCase (`fileName`, `uploadFile`)
 - **Classes/Interfaces**: PascalCase (`MinIOProvider`, `StrapiFile`)
-- **Constantes**: UPPER_SNAKE_CASE (`DEFAULT_REGION`)
-- **Arquivos**: kebab-case (`minio-provider.ts`)
+- **Constants**: UPPER_SNAKE_CASE (`DEFAULT_REGION`)
+- **Files**: kebab-case (`minio-provider.ts`)
 
 ### Commits
 
-Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```bash
-# Exemplos
+# Examples
 feat: add support for custom metadata
 fix: resolve bucket creation error
 docs: update installation guide
@@ -178,45 +178,45 @@ refactor: improve error handling
 test: add upload integration tests
 ```
 
-### Estrutura de Arquivos
+### File Structure
 
 ```
 src/
-├── __tests__/          # Testes
-├── types/              # Definições de tipos
-├── utils/              # Utilitários
-├── index.ts            # Provider principal
-└── constants.ts        # Constantes
+├── __tests__/          # Tests
+├── types/              # Type definitions
+├── utils/              # Utilities
+├── index.ts            # Main provider
+└── constants.ts        # Constants
 ```
 
-## 📦 Versionamento
+## 📦 Versioning
 
-Usamos [Semantic Versioning](https://semver.org/):
+We use [Semantic Versioning](https://semver.org/):
 
 - **PATCH** (1.0.1): Bug fixes
-- **MINOR** (1.1.0): Novas funcionalidades (compatível)
-- **MAJOR** (2.0.0): Mudanças breaking
+- **MINOR** (1.1.0): New features (compatible)
+- **MAJOR** (2.0.0): Breaking changes
 
-## 🚀 Process de Release
+## 🚀 Release Process
 
-1. Mudanças são mergeadas na `main`
-2. CI executa testes e build
-3. Semantic Release automaticamente:
-   - Analisa commits
-   - Gera CHANGELOG
-   - Cria tag/release
-   - Publica no npm
+1. Changes are merged into `main`
+2. CI runs tests and build
+3. Semantic Release automatically:
+   - Analyzes commits
+   - Generates CHANGELOG
+   - Creates tag/release
+   - Publishes to npm
 
-## 📚 Recursos Úteis
+## 📚 Useful Resources
 
 - [Strapi Documentation](https://docs.strapi.io/)
 - [MinIO JavaScript SDK](https://docs.min.io/docs/javascript-client-api-reference.html)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 - [Jest Testing Framework](https://jestjs.io/docs/getting-started)
 
-## ❓ Dúvidas?
+## ❓ Questions?
 
-- Abra uma [Discussion](https://github.com/seu-usuario/strapi-provider-upload-minio/discussions)
-- Entre em contato: seu.email@example.com
+- Open a [Discussion](https://github.com/seu-usuario/strapi-provider-upload-minio/discussions)
+- Contact: your.email@example.com
 
-Obrigado pela contribuição! 🙏
+Thank you for your contribution! 🙏

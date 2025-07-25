@@ -5,7 +5,7 @@ import minioProvider from '../index';
 import { Client } from 'minio';
 import type { StrapiFile } from '../index.types';
 
-// Mock do MinIO client
+// Mock MinIO client
 jest.mock('minio');
 const MockedClient = Client as unknown as jest.Mocked<typeof Client>;
 
@@ -30,7 +30,7 @@ describe('MinIO Provider', () => {
     size: 12345,
     buffer: Buffer.from('test file content'),
     provider: 'minio',
-    // As propriedades url e provider_metadata são opcionais e serão preenchidas pelo provider
+    // The url and provider_metadata properties are optional and will be filled by the provider
   };
 
   let provider: any;

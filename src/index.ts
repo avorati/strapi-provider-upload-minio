@@ -2,7 +2,7 @@ import { Client } from "minio";
 import { MinIOConfig, StrapiFile, UploadOptions } from "./index.types";
 
 export function init(config: MinIOConfig) {
-  // Validação da configuração
+  // Configuration validation
   if (
     !config.endPoint ||
     !config.accessKey ||
@@ -14,7 +14,7 @@ export function init(config: MinIOConfig) {
     );
   }
 
-  // Inicializar cliente MinIO
+  // Initialize MinIO client
   const client = new Client({
     endPoint: config.endPoint,
     port: config.port || (config.useSSL ? 443 : 80),
@@ -30,13 +30,13 @@ export function init(config: MinIOConfig) {
     config.baseUrl ||
     `${config.useSSL ? "https" : "http"}://${config.endPoint}${config.port && config.port !== (config.useSSL ? 443 : 80) ? `:${config.port}` : ""}`;
 
-  // Função para gerar o caminho do arquivo
+  // Function to generate file path
   const getKey = (file: StrapiFile): string => {
     const path = folder ? `${folder.replace(/\/$/, "")}/` : "";
     return `${path}${file.hash}${file.ext}`;
   };
 
-  // Função para gerar URL pública
+  // Function to generate public URL
   const getUrl = (key: string): string => {
     return `${baseUrl}/${bucket}/${key}`;
   };
@@ -46,12 +46,12 @@ export function init(config: MinIOConfig) {
       const key = getKey(file);
 
       try {
-        // Verificar se o bucket existe, criar se não existir
+        // Check if bucket exists, create if not
         const bucketExists = await client.bucketExists(bucket);
         if (!bucketExists) {
           await client.makeBucket(bucket, config.region || "us-east-1");
 
-          // Configurar política pública se não for privado
+          // Set public policy if not private
           if (!options.isPrivate) {
             const policy = {
               Version: "2012-10-17",
@@ -68,7 +68,7 @@ export function init(config: MinIOConfig) {
           }
         }
 
-        // Preparar metadados
+        // Prepare metadata
         const metadata = {
           "Content-Type": file.mime,
           "Content-Disposition": `inline; filename="${file.name}"`,
@@ -79,7 +79,7 @@ export function init(config: MinIOConfig) {
           ...(file.caption && { "x-amz-meta-caption": file.caption }),
         };
 
-        // Upload do arquivo
+        // File upload
         let uploadResult;
         if (file.stream) {
           uploadResult = await client.putObject(
@@ -101,7 +101,7 @@ export function init(config: MinIOConfig) {
           throw new Error("File must have either stream or buffer");
         }
 
-        // Atualizar informações do arquivo
+        // Update file information
         file.url = options.isPrivate ? undefined : getUrl(key);
         file.provider_metadata = {
           key,
@@ -153,7 +153,7 @@ export function init(config: MinIOConfig) {
       options: { expiresIn?: number } = {},
     ): Promise<string> {
       const key = file.provider_metadata?.key || getKey(file);
-      const expiry = options.expiresIn || 3600; // 1 hora por padrão
+      const expiry = options.expiresIn || 3600; // 1 hour by default
 
       try {
         return await client.presignedGetObject(bucket, key, expiry);
@@ -167,7 +167,7 @@ export function init(config: MinIOConfig) {
     },
 
     async isPrivate(): Promise<boolean> {
-      return false; // Por padrão, arquivos são públicos
+      return false; // By default, files are public
     },
   };
 }

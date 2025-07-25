@@ -1,28 +1,28 @@
-# 🚀 Guia de Deployment
+# 🚀 Deployment Guide
 
-Este guia contém instruções para publicar o provider MinIO no marketplace do Strapi e no npm.
+This guide contains instructions for publishing the MinIO provider to the Strapi marketplace and npm.
 
-## 📦 Preparação para Publicação
+## 📦 Preparation for Publishing
 
-### 1. Verificações Pré-Publicação
+### 1. Pre-Publishing Checks
 
 ```bash
-# Verificar se todos os testes passam
+# Check if all tests pass
 npm test
 
-# Verificar linting
+# Check linting
 npm run lint
 
-# Build do projeto
+# Build the project
 npm run build
 
-# Verificar estrutura do pacote
+# Check package structure
 npm pack --dry-run
 ```
 
-### 2. Configuração do package.json
+### 2. package.json Configuration
 
-Certifique-se que as informações estão corretas:
+Make sure the information is correct:
 
 ```json
 {
@@ -51,71 +51,71 @@ Certifique-se que as informações estão corretas:
 }
 ```
 
-## 📋 Checklist de Qualidade
+## 📋 Quality Checklist
 
-- [ ] **Documentação completa**: README detalhado com exemplos
-- [ ] **Testes abrangentes**: Cobertura > 80%
-- [ ] **TypeScript**: Tipos completos e exportados
-- [ ] **Configuração**: Validação de parâmetros obrigatórios
-- [ ] **Tratamento de erros**: Mensagens claras e úteis
-- [ ] **Performance**: Otimizado para arquivos grandes
-- [ ] **Segurança**: Validações de entrada e saída
-- [ ] **Compatibilidade**: Testado com diferentes versões do Node.js
+- [ ] **Complete documentation**: Detailed README with examples
+- [ ] **Comprehensive tests**: Coverage > 80%
+- [ ] **TypeScript**: Complete and exported types
+- [ ] **Configuration**: Validation of required parameters
+- [ ] **Error handling**: Clear and useful messages
+- [ ] **Performance**: Optimized for large files
+- [ ] **Security**: Input and output validations
+- [ ] **Compatibility**: Tested with different Node.js versions
 
-## 🌐 Publicação no NPM
+## 🌐 Publishing to NPM
 
-### 1. Configurar NPM Account
+### 1. Set up NPM Account
 
 ```bash
-# Login no npm
+# Login to npm
 npm login
 
-# Verificar usuário logado
+# Check logged in user
 npm whoami
 ```
 
-### 2. Configurar Scoped Package
+### 2. Configure Scoped Package
 
 ```bash
-# Para organizações
+# For organizations
 npm config set @strapi-community:registry https://registry.npmjs.org/
 ```
 
-### 3. Publicar
+### 3. Publish
 
 ```bash
-# Primeira publicação
+# First publish
 npm publish --access public
 
-# Para atualizações (usando semantic-release)
+# For updates (using semantic-release)
 git commit -m "feat: add new feature"
 git push origin main
 ```
 
-## 📱 Submetendo ao Strapi Market
+## 📱 Submitting to Strapi Market
 
-### 1. Preparar Submission
+### 1. Prepare Submission
 
-O Strapi Market requer alguns arquivos específicos:
+Strapi Market requires some specific files:
 
 ```bash
-# Estrutura necessária
-├── README.md          # Documentação completa
-├── package.json       # Configuração com "strapi" field
-├── CHANGELOG.md       # Histórico de versões
+# Required structure
+├── README.md          # Complete documentation
+├── package.json       # Configuration with "strapi" field
+├── CHANGELOG.md       # Version history
 ├── assets/
-│   ├── logo.png       # Logo 512x512px
+│   ├── logo.png       # 512x512px logo
 │   ├── screenshot1.png
 │   └── screenshot2.png
 ```
 
-### 2. Logo e Screenshots
+### 2. Logo and Screenshots
 
-- **Logo**: 512x512px, fundo transparente, formato PNG
-- **Screenshots**: Demonstrando configuração e uso
-- **Banner** (opcional): 1200x400px para destaque
+- **Logo**: 512x512px, transparent background, PNG format
+- **Screenshots**: Showing configuration and usage
+- **Banner** (optional): 1200x400px for highlight
 
-### 3. Metadados para Market
+### 3. Market Metadata
 
 ```json
 {
@@ -139,28 +139,28 @@ O Strapi Market requer alguns arquivos específicos:
 }
 ```
 
-### 4. Submeter ao Market
+### 4. Submit to Market
 
-1. Acesse [Strapi Market](https://market.strapi.io/submit-plugin)
-2. Preencha o formulário de submissão
-3. Forneça:
-   - URL do repositório GitHub
-   - URL do package no npm
-   - Descrição detalhada
+1. Go to [Strapi Market](https://market.strapi.io/submit-plugin)
+2. Fill out the submission form
+3. Provide:
+   - GitHub repository URL
+   - npm package URL
+   - Detailed description
    - Screenshots/demos
-   - Informações de contato
+   - Contact information
 
-### 5. Critérios de Aprovação
+### 5. Approval Criteria
 
-- **Funcionalidade**: Provider funciona conforme documentado
-- **Qualidade**: Código limpo, bem testado
-- **Documentação**: README claro e completo
-- **Compatibilidade**: Funciona com Strapi v5
-- **Manutenção**: Resposta a issues em tempo hábil
+- **Functionality**: Provider works as documented
+- **Quality**: Clean, well-tested code
+- **Documentation**: Clear and complete README
+- **Compatibility**: Works with Strapi v5
+- **Maintenance**: Timely response to issues
 
-## 🔄 Processo de Release Automático
+## 🔄 Automatic Release Process
 
-### 1. Configurar Semantic Release
+### 1. Set up Semantic Release
 
 ```json
 {
@@ -179,11 +179,11 @@ O Strapi Market requer alguns arquivos específicos:
 }
 ```
 
-### 2. Configurar GitHub Secrets
+### 2. Configure GitHub Secrets
 
-No repositório GitHub, adicionar secrets:
-- `NPM_TOKEN`: Token do npm para publicação
-- `GITHUB_TOKEN`: Já disponível automaticamente
+In the GitHub repository, add secrets:
+- `NPM_TOKEN`: npm token for publishing
+- `GITHUB_TOKEN`: Already available automatically
 
 ### 3. Conventional Commits
 
@@ -198,105 +198,105 @@ git commit -m "feat: add support for custom metadata"
 git commit -m "feat!: change configuration structure"
 ```
 
-## 📊 Monitoramento Pós-Publicação
+## 📊 Post-Publishing Monitoring
 
-### 1. Métricas NPM
+### 1. NPM Metrics
 
-- Downloads mensais
-- Versões mais usadas
+- Monthly downloads
+- Most used versions
 - Dependents
 
 ### 2. GitHub Analytics
 
-- Stars e forks
-- Issues abertas/fechadas
+- Stars and forks
+- Open/closed issues
 - Pull requests
 - Community health
 
 ### 3. Strapi Market
 
-- Views e downloads
-- Reviews dos usuários
+- Views and downloads
+- User reviews
 - Rating
 
-## 🛠 Manutenção Contínua
+## 🛠️ Continuous Maintenance
 
-### 1. Atualizações Regulares
+### 1. Regular Updates
 
-- Compatibilidade com novas versões do Strapi
-- Atualizações de segurança
-- Melhorias de performance
+- Compatibility with new Strapi versions
+- Security updates
+- Performance improvements
 
-### 2. Suporte à Comunidade
+### 2. Community Support
 
-- Resposta a issues em 48h
-- Review de pull requests
-- Documentação atualizada
+- Response to issues within 48h
+- Pull request reviews
+- Updated documentation
 
 ### 3. Roadmap
 
-- Novas funcionalidades baseadas em feedback
-- Melhorias sugeridas pela comunidade
-- Integração com outras ferramentas
+- New features based on feedback
+- Community-suggested improvements
+- Integration with other tools
 
-## 📋 Templates Úteis
+## 📋 Useful Templates
 
 ### Issue Template
 
 ```markdown
 ---
 name: Bug Report
-about: Criar relatório de bug
+about: Create a bug report
 title: ''
 labels: 'bug'
 assignees: ''
 ---
 
-**Descrição do Bug**
-Descrição clara do problema.
+**Bug Description**
+Clear description of the problem.
 
-**Reproduzir**
-Passos para reproduzir:
+**To Reproduce**
+Steps to reproduce:
 1. ...
 2. ...
 
-**Comportamento Esperado**
-O que deveria acontecer.
+**Expected Behavior**
+What should happen.
 
-**Ambiente:**
-- Node.js: [versão]
-- Strapi: [versão]
-- Provider: [versão]
-- MinIO: [versão]
+**Environment:**
+- Node.js: [version]
+- Strapi: [version]
+- Provider: [version]
+- MinIO: [version]
 ```
 
 ### PR Template
 
 ```markdown
-## 📝 Descrição
-Breve descrição das mudanças.
+## 📝 Description
+Brief description of the changes.
 
-## 🔗 Issues Relacionadas
+## 🔗 Related Issues
 Fixes #123
 
-## 🧪 Testes
-- [ ] Testes adicionados/atualizados
-- [ ] Todos os testes passando
+## 🧪 Tests
+- [ ] Tests added/updated
+- [ ] All tests passing
 
 ## 📋 Checklist
-- [ ] Código revisado
-- [ ] Documentação atualizada
-- [ ] CHANGELOG atualizado
+- [ ] Code reviewed
+- [ ] Documentation updated
+- [ ] CHANGELOG updated
 ```
 
-## 🎯 Próximos Passos
+## 🎯 Next Steps
 
-1. **Publicar versão inicial** no npm
-2. **Submeter ao Strapi Market**
-3. **Divulgar na comunidade** (Discord, Forums)
-4. **Coletar feedback** dos primeiros usuários
-5. **Iterar e melhorar** baseado no feedback
+1. **Publish initial version** on npm
+2. **Submit to Strapi Market**
+3. **Promote in the community** (Discord, Forums)
+4. **Collect feedback** from early users
+5. **Iterate and improve** based on feedback
 
 ---
 
-**Sucesso! 🎉** Seu provider está pronto para ser usado pela comunidade Strapi!
+**Success! 🎉** Your provider is ready to be used by the Strapi community!

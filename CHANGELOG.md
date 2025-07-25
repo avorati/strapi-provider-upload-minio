@@ -1,66 +1,66 @@
 # Changelog
 
-Todas as mudanças importantes do projeto serão documentadas neste arquivo.
+All notable changes to this project will be documented in this file.
 
-O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-e este projeto adere ao [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Planejado
-- Suporte para múltiplas regiões
-- Cache de metadados
-- Compressão automática de imagens
-- Integração com CDN
+### Planned
+- Support for multiple regions
+- Metadata cache
+- Automatic image compression
+- CDN integration
 
 ## [1.0.0] - 2025-01-XX
 
 ### Added
-- Provider MinIO para Strapi v5
-- Upload de arquivos públicos e privados
-- Geração de URLs assinadas
-- Criação automática de buckets
-- Suporte a streaming de arquivos grandes
-- Configuração de metadados personalizados
-- Suporte completo ao TypeScript
-- Testes unitários e de integração
-- Documentação completa
+- MinIO provider for Strapi v5
+- Public and private file uploads
+- Signed URL generation
+- Automatic bucket creation
+- Large file streaming support
+- Custom metadata configuration
+- Full TypeScript support
+- Unit and integration tests
+- Complete documentation
 - CI/CD pipeline
-- Configuração automática de políticas de bucket
+- Automatic bucket policy configuration
 
 ### Security
-- Validação de configuração obrigatória
-- Sanitização de nomes de arquivos
-- Controle de acesso baseado em políticas
+- Required configuration validation
+- File name sanitization
+- Policy-based access control
 
 ## [0.1.0-beta.3] - 2025-01-XX
 
 ### Added
-- Implementação básica do provider
-- Testes iniciais
-- Documentação preliminar
+- Basic provider implementation
+- Initial tests
+- Preliminary documentation
 
 ### Changed
-- Melhorias na interface de configuração
-- Otimização do processo de upload
+- Improvements to configuration interface
+- Upload process optimization
 
 ### Fixed
-- Correções em edge cases de upload
-- Melhoria no tratamento de erros
+- Edge case upload fixes
+- Improved error handling
 
 ## [0.1.0-beta.2] - 2025-01-XX
 
 ### Added
-- Suporte inicial para Strapi v5
-- Configuração básica do MinIO
+- Initial support for Strapi v5
+- Basic MinIO configuration
 
 ### Fixed
-- Problemas de compatibilidade com Node.js 18+
-- Questões de tipagem TypeScript
+- Compatibility issues with Node.js 18+
+- TypeScript typing issues
 
 ## [0.1.0-beta.1] - 2025-01-XX
 
 ### Added
-- Versão inicial do provider
-- Funcionalidades básicas de upload e delete
-- Estrutura inicial do projeto
+- Initial provider version
+- Basic upload and delete features
+- Initial project structure
