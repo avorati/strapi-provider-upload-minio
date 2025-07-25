@@ -1,34 +1,39 @@
+<!-- Logo -->
+<p align="center">
+  <img src="public/assets/strapi-provider-upload-minio-logo.png" alt="Strapi Provider Upload MinIO Logo" width="180" />
+</p>
+
 # Strapi Provider Upload MinIO
 
 [![npm version](https://img.shields.io/npm/v/@avorati/strapi-provider-upload-minio.svg)](https://www.npmjs.com/package/@avorati/strapi-provider-upload-minio)
 [![npm downloads](https://img.shields.io/npm/dm/@avorati/strapi-provider-upload-minio.svg)](https://www.npmjs.com/package/@avorati/strapi-provider-upload-minio)
 
-Provider de upload para Strapi v5 que permite armazenar arquivos no MinIO (S3-compatible storage).
+Upload provider for Strapi v5 that allows storing files in MinIO (S3-compatible storage).
 
-## ✨ Características
+## ✨ Features
 
-- ✅ Compatível com Strapi v5
-- ✅ Suporte completo ao MinIO
-- ✅ Upload de arquivos públicos e privados
-- ✅ URLs assinadas para arquivos privados
-- ✅ Configuração de bucket automática
-- ✅ Metadados personalizados
+- ✅ Compatible with Strapi v5
+- ✅ Full MinIO support
+- ✅ Public and private file uploads
+- ✅ Signed URLs for private files
+- ✅ Automatic bucket configuration
+- ✅ Custom metadata
 - ✅ TypeScript support
-- ✅ Streaming de arquivos grandes
+- ✅ Large file streaming
 
-## 📦 Instalação
+## 📦 Installation
 
 ```bash
 npm install @avorati/strapi-provider-upload-minio
-# ou
+# or
 yarn add @avorati/strapi-provider-upload-minio
 ```
 
-## ⚙️ Configuração
+## ⚙️ Configuration
 
-### 1. Configurar o provider no Strapi
+### 1. Configure the provider in Strapi
 
-Crie ou edite o arquivo `config/plugins.ts` (ou `.js`):
+Create or edit the `config/plugins.ts` (or `.js`) file:
 
 ```typescript
 export default {
@@ -43,17 +48,17 @@ export default {
         secretKey: process.env.MINIO_SECRET_KEY,
         bucket: process.env.MINIO_BUCKET || 'strapi-uploads',
         region: process.env.MINIO_REGION || 'us-east-1',
-        folder: process.env.MINIO_FOLDER || '', // opcional
-        baseUrl: process.env.MINIO_BASE_URL, // opcional, auto-gerado se não fornecido
+        folder: process.env.MINIO_FOLDER || '', // optional
+        baseUrl: process.env.MINIO_BASE_URL, // optional, auto-generated if not provided
       },
     },
   },
 };
 ```
 
-### 2. Variáveis de ambiente
+### 2. Environment variables
 
-Adicione as seguintes variáveis ao seu arquivo `.env`:
+Add the following variables to your `.env` file:
 
 ```env
 MINIO_ENDPOINT=localhost
@@ -67,22 +72,22 @@ MINIO_FOLDER=uploads
 MINIO_BASE_URL=http://localhost:9000
 ```
 
-## 🚀 Uso
+## 🚀 Usage
 
-### Upload básico
+### Basic upload
 
-O provider funciona automaticamente com o sistema de upload do Strapi. Você pode fazer upload de arquivos através da API ou do painel administrativo.
+The provider works automatically with Strapi's upload system. You can upload files via the API or the admin panel.
 
-### URLs assinadas para arquivos privados
+### Signed URLs for private files
 
 ```typescript
-// Gerar URL assinada válida por 1 hora
+// Generate a signed URL valid for 1 hour
 const signedUrl = await strapi.plugin('upload').provider.getSignedUrl(file, { 
   expiresIn: 3600 
 });
 ```
 
-### Upload programático
+### Programmatic upload
 
 ```typescript
 const file = {
@@ -91,7 +96,7 @@ const file = {
   ext: '.jpg',
   mime: 'image/jpeg',
   size: 12345,
-  buffer: fileBuffer, // ou stream: fileStream
+  buffer: fileBuffer, // or stream: fileStream
 };
 
 await strapi.plugin('upload').provider.upload(file, { 
@@ -99,21 +104,21 @@ await strapi.plugin('upload').provider.upload(file, {
 });
 ```
 
-## 🔧 Opções de configuração
+## 🔧 Configuration options
 
-| Opção | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `endPoint` | string | ✅ | Endpoint do servidor MinIO |
-| `port` | number | ❌ | Porta do servidor (padrão: 9000 para HTTP, 443 para HTTPS) |
-| `useSSL` | boolean | ❌ | Usar HTTPS (padrão: false) |
-| `accessKey` | string | ✅ | Chave de acesso do MinIO |
-| `secretKey` | string | ✅ | Chave secreta do MinIO |
-| `bucket` | string | ✅ | Nome do bucket para armazenar arquivos |
-| `region` | string | ❌ | Região do bucket (padrão: 'us-east-1') |
-| `folder` | string | ❌ | Pasta dentro do bucket (opcional) |
-| `baseUrl` | string | ❌ | URL base personalizada para arquivos públicos |
+| Option      | Type   | Required | Description                                 |
+|-------------|--------|----------|---------------------------------------------|
+| `endPoint`  | string | ✅       | MinIO server endpoint                       |
+| `port`      | number | ❌       | Server port (default: 9000 for HTTP, 443 for HTTPS) |
+| `useSSL`    | boolean| ❌       | Use HTTPS (default: false)                  |
+| `accessKey` | string | ✅       | MinIO access key                            |
+| `secretKey` | string | ✅       | MinIO secret key                            |
+| `bucket`    | string | ✅       | Bucket name to store files                  |
+| `region`    | string | ❌       | Bucket region (default: 'us-east-1')        |
+| `folder`    | string | ❌       | Folder inside the bucket (optional)         |
+| `baseUrl`   | string | ❌       | Custom base URL for public files            |
 
-## 🐳 Docker Compose - MinIO para desenvolvimento
+## 🐳 Docker Compose - MinIO for development
 
 ```yaml
 version: '3.8'
@@ -145,11 +150,11 @@ volumes:
   minio_data:
 ```
 
-## 🔐 Segurança
+## 🔒 Security
 
-### Arquivos privados
+### Private files
 
-Por padrão, os arquivos são públicos. Para uploads privados:
+By default, files are public. For private uploads:
 
 ```typescript
 await strapi.plugin('upload').provider.upload(file, { 
@@ -157,61 +162,61 @@ await strapi.plugin('upload').provider.upload(file, {
 });
 ```
 
-Arquivos privados requerem URLs assinadas para acesso:
+Private files require signed URLs for access:
 
 ```typescript
 const signedUrl = await strapi.plugin('upload').provider.getSignedUrl(file);
 ```
 
-### Configuração de CORS
+### CORS configuration
 
-Configure CORS no MinIO para permitir acesso do frontend:
+Configure CORS in MinIO to allow frontend access:
 
 ```bash
 mc admin config set myminio api cors_allow_origin="*"
 ```
 
-## 🧪 Desenvolvimento
+## 🛠️ Development
 
 ```bash
-# Clonar repositório
+# Clone repository
 git clone https://github.com/avorati/strapi-provider-upload-minio.git
 cd strapi-provider-upload-minio
 
-# Instalar dependências
+# Install dependencies
 npm install
 
 # Build
 npm run build
 
-# Desenvolvimento com watch
+# Development with watch
 npm run dev
 
-# Testes
+# Tests
 npm test
 ```
 
-## 📄 Licença
+## 📄 License
 
-MIT License - veja [LICENSE](LICENSE) para detalhes.
+MIT License - see [LICENSE](LICENSE) for details.
 
-## 🤝 Contribuição
+## 🤝 Contributing
 
-Contribuições são bem-vindas! Por favor:
+Contributions are welcome! Please:
 
-1. Fork o repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/amazing-feature`)
-3. Commit suas mudanças (`git commit -m 'Add some amazing feature'`)
-4. Push para a branch (`git push origin feature/amazing-feature`)
-5. Abra um Pull Request
+1. Fork the repository
+2. Create a branch for your feature (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📞 Suporte
+## 📞 Support
 
 - 🐛 [Issues](https://github.com/avorati/strapi-provider-upload-minio/issues)
 - 💬 [Discussions](https://github.com/avorati/strapi-provider-upload-minio/discussions)
-- 📧 Email: seu.email@example.com
+- 📧 Email: your.email@example.com
 
-## 🙏 Agradecimentos
+## 🙏 Acknowledgements
 
-- [Strapi](https://strapi.io/) - Framework headless CMS
+- [Strapi](https://strapi.io/) - Headless CMS framework
 - [MinIO](https://min.io/) - High-performance object storage
