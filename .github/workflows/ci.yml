@@ -123,8 +123,14 @@ jobs:
           echo "version_exists=true" >> $GITHUB_OUTPUT
           echo "⚠️ Version $CURRENT_VERSION already exists on NPM"
         else
-          echo "version_exists=false" >> $GITHUB_OUTPUT
-          echo "✅ Version $CURRENT_VERSION is new"
+          # Tentar buscar o pacote sem a versão para ver se o pacote existe
+          if yarn info @avorati/strapi-provider-upload-minio > /dev/null 2>&1; then
+            echo "version_exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Version $CURRENT_VERSION is new"
+          else
+            echo "version_exists=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Pacote nunca publicado no NPM, será publicado agora"
+          fi
         fi
 
     - name: Publish to NPM
