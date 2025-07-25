@@ -1,7 +1,7 @@
 
 import {jest, describe, beforeEach, expect, it} from '@jest/globals';
 
-import minioProvider from '../index';
+import * as minioProvider from '../index';
 import { Client } from 'minio';
 import type { StrapiFile } from '../index.types';
 

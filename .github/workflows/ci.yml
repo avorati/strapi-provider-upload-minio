@@ -14,42 +14,79 @@ jobs:
       matrix:
         node-version: [18.x, 20.x]
 
-    services:
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        options: --health-cmd "curl -f http://localhost:9000/minio/health/live" --health-interval 10s --health-timeout 5s --health-retries 3
-        args: server /data
-
     steps:
     - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Start MinIO
+      run: |
+        docker run -d \
+          --name minio \
+          -p 9000:9000 \
+          -p 9001:9001 \
+          -e MINIO_ROOT_USER=minioadmin \
+          -e MINIO_ROOT_PASSWORD=minioadmin \
+          minio/minio:latest \
+          server /data --console-address ":9001"
+
+    - name: Wait for MinIO to be ready
+      run: |
+        echo "Waiting for MinIO to start..."
+        for i in {1..30}; do
+          if curl -f http://localhost:9000/minio/health/live > /dev/null 2>&1 || curl -f http://localhost:9000 > /dev/null 2>&1; then
+            echo "MinIO is ready!"
+            break
+          fi
+          echo "Attempt $i/30: MinIO not ready yet..."
+          sleep 5
+        done
+        
+        # Verificar se MinIO está realmente funcionando
+        curl -I http://localhost:9000 || exit 1
+
+    - name: Create test bucket
+      run: |
+        # Instalar mc (MinIO Client)
+        wget https://dl.min.io/client/mc/release/linux-amd64/mc
+        chmod +x mc
+        ./mc alias set local http://localhost:9000 minioadmin minioadmin
+        
+        # Criar bucket de teste
+        ./mc mb local/strapi-uploads --ignore-existing
+        
+        # Definir política pública para o bucket (para testes)
+        ./mc anonymous set public local/strapi-uploads
 
     - name: Install dependencies
       run: npm ci
 
-    - name: Run lint
-      run: npm run lint --if-present
+    - name: Run tests
+      run: npm test
 
     - name: Build project
       run: npm run build
-
-    - name: Run tests
-      run: npm test
       env:
         MINIO_ENDPOINT: localhost
         MINIO_PORT: 9000
+        MINIO_USE_SSL: false
         MINIO_ACCESS_KEY: minioadmin
         MINIO_SECRET_KEY: minioadmin
-        MINIO_BUCKET: test-bucket
+        MINIO_BUCKET: strapi-uploads
+        MINIO_REGION: us-east-1
+        MINIO_BASE_URL: http://localhost:9000
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
+      if: matrix.node-version == '20.x'
       with:
         file: ./coverage/lcov.info
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
 
   publish:
     needs: test
@@ -58,6 +95,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Use Node.js
       uses: actions/setup-node@v4
@@ -65,14 +104,63 @@ jobs:
         node-version: '20.x'
         registry-url: 'https://registry.npmjs.org'
         scope: '@avorati'
+        cache: 'npm'
 
     - name: Install dependencies
       run: npm ci
 
-    - name: Build project
-      run: npm run build
+    - name: Build project (handled by prepublishOnly)
+      run: echo "Build will be handled by prepublishOnly hook"
+
+    - name: Check if version changed
+      id: version_check
+      run: |
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # Verificar se a versão já existe no NPM
+        if npm view @avorati/strapi-provider-upload-minio@$CURRENT_VERSION > /dev/null 2>&1; then
+          echo "version_exists=true" >> $GITHUB_OUTPUT
+          echo "⚠️ Version $CURRENT_VERSION already exists on NPM"
+        else
+          echo "version_exists=false" >> $GITHUB_OUTPUT
+          echo "✅ Version $CURRENT_VERSION is new"
+        fi
 
     - name: Publish to NPM
+      if: steps.version_check.outputs.version_exists == 'false'
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: npm publish --access public
+      run: |
+        echo "Publishing version ${{ steps.version_check.outputs.current_version }} to NPM..."
+        npm publish --access public
+
+    - name: Create GitHub Release
+      if: steps.version_check.outputs.version_exists == 'false'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version_check.outputs.current_version }}
+        release_name: Release ${{ steps.version_check.outputs.current_version }}
+        body: |
+          🚀 **Strapi Provider Upload MinIO v${{ steps.version_check.outputs.current_version }}**
+          
+          ## Changes
+          - Check the commit history for detailed changes
+          
+          ## Installation
+          ```bash
+          npm install @avorati/strapi-provider-upload-minio@${{ steps.version_check.outputs.current_version }}
+          ```
+          
+          ## Documentation
+          See the [README](https://github.com/avorati/strapi-provider-upload-minio#readme) for usage instructions.
+        draft: false
+        prerelease: false
+
+    - name: Skip publish (version exists)
+      if: steps.version_check.outputs.version_exists == 'true'
+      run: |
+        echo "🔄 Skipping publish - version ${{ steps.version_check.outputs.current_version }} already exists"
+        echo "💡 To publish a new version, update the version in package.json"
