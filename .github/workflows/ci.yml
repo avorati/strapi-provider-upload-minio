@@ -63,13 +63,13 @@ jobs:
         ./mc anonymous set public local/strapi-uploads
 
     - name: Install dependencies
-      run: npm ci
+      run: yarn install --frozen-lockfile
 
     - name: Run tests
-      run: npm test
+      run: yarn test
 
     - name: Build project
-      run: npm run build
+      run: yarn build
       env:
         MINIO_ENDPOINT: localhost
         MINIO_PORT: 9000
@@ -107,7 +107,7 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      run: yarn install --frozen-lockfile
 
     - name: Build project (handled by prepublishOnly)
       run: echo "Build will be handled by prepublishOnly hook"
@@ -119,7 +119,7 @@ jobs:
         echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
         
         # Verificar se a versão já existe no NPM
-        if npm view @avorati/strapi-provider-upload-minio@$CURRENT_VERSION > /dev/null 2>&1; then
+        if yarn info @avorati/strapi-provider-upload-minio@$CURRENT_VERSION > /dev/null 2>&1; then
           echo "version_exists=true" >> $GITHUB_OUTPUT
           echo "⚠️ Version $CURRENT_VERSION already exists on NPM"
         else
@@ -133,7 +133,7 @@ jobs:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: |
         echo "Publishing version ${{ steps.version_check.outputs.current_version }} to NPM..."
-        npm publish --access public
+        yarn publish --access public
 
     - name: Create GitHub Release
       if: steps.version_check.outputs.version_exists == 'false'
@@ -151,7 +151,7 @@ jobs:
           
           ## Installation
           ```bash
-          npm install @avorati/strapi-provider-upload-minio@${{ steps.version_check.outputs.current_version }}
+          yarn add @avorati/strapi-provider-upload-minio@${{ steps.version_check.outputs.current_version }}
           ```
           
           ## Documentation
