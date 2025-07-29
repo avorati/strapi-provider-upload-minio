@@ -79,7 +79,7 @@ describe('MinIO Provider', () => {
         'test-bucket',
         'test_hash.jpg',
         mockFile.buffer,
-        mockFile.size,
+        mockFile.buffer!.length,
         expect.objectContaining({
           'Content-Type': 'image/jpeg',
           'Content-Disposition': 'inline; filename="test.jpg"'

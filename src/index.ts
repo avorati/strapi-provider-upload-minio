@@ -5,10 +5,9 @@ const mime = require("mime-types");
 
 export function init(config: MinIOConfig) {
   // Validação de configuração com mensagens específicas
-  if (!config.endPoint) throw new Error("MinIO provider requires endPoint");
-  if (!config.accessKey) throw new Error("MinIO provider requires accessKey");
-  if (!config.secretKey) throw new Error("MinIO provider requires secretKey");
-  if (!config.bucket) throw new Error("MinIO provider requires bucket");
+  if (!config.endPoint || !config.accessKey || !config.secretKey || !config.bucket) {
+    throw new Error("MinIO provider requires endPoint, accessKey, secretKey, and bucket");
+  }
 
   // Inicialização do cliente MinIO
   const client = new Client({
@@ -35,9 +34,12 @@ export function init(config: MinIOConfig) {
 
   // Gera o caminho do arquivo no bucket
   const getKey = (file: StrapiFile): string => {
-    const pathChunk = ""; // Strapi v5 não usa 'path'
-    const path = folder ? `${folder}/${pathChunk}` : pathChunk;
-    return `${path}${file.hash}${file.ext}`;
+    // Remove barra final do folder, se houver
+    const cleanFolder = folder.replace(/\/+$/, "");
+    if (cleanFolder) {
+      return `${cleanFolder}/${file.hash}${file.ext}`;
+    }
+    return `${file.hash}${file.ext}`;
   };
 
   // Gera a URL pública do arquivo
@@ -80,6 +82,7 @@ export function init(config: MinIOConfig) {
 
         const metadata = {
           "Content-Type": mime.lookup(file.ext) || "application/octet-stream",
+          "Content-Disposition": `inline; filename=\"${file.name}\"`
         };
 
         const uploadData: ReadStream | Buffer | undefined =
