@@ -41,47 +41,106 @@ export function init(config: MinIOConfig) {
     return `${baseUrl}/${bucket}/${key}`;
   };
 
+  // Helper function to ensure bucket exists and is configured
+  const ensureBucket = async (isPrivate: boolean = false): Promise<void> => {
+    const bucketExists = await client.bucketExists(bucket);
+    if (!bucketExists) {
+      await client.makeBucket(bucket, config.region || "us-east-1");
+
+      // Set public policy if not private
+      if (!isPrivate) {
+        const policy = {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { AWS: "*" },
+              Action: ["s3:GetObject"],
+              Resource: [`arn:aws:s3:::${bucket}/*`],
+            },
+          ],
+        };
+        await client.setBucketPolicy(bucket, JSON.stringify(policy));
+      }
+    }
+  };
+
+  // Helper function to properly close streams
+  const closeStream = (stream: any): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!stream || typeof stream.close !== "function") {
+        resolve();
+        return;
+      }
+
+      // Handle different types of streams
+      if (stream.destroyed || stream.readableEnded) {
+        resolve();
+        return;
+      }
+
+      const cleanup = () => {
+        stream.removeAllListeners('close');
+        stream.removeAllListeners('end');
+        stream.removeAllListeners('error');
+      };
+
+      stream.once('close', () => {
+        cleanup();
+        resolve();
+      });
+
+      stream.once('error', (error: Error) => {
+        cleanup();
+        reject(error);
+      });
+
+      // For readable streams that might already be ended
+      if (stream.readable === false) {
+        cleanup();
+        resolve();
+        return;
+      }
+
+      try {
+        stream.close();
+      } catch (error) {
+        cleanup();
+        // If close fails, try to destroy the stream
+        if (typeof stream.destroy === 'function') {
+          stream.destroy();
+        }
+        resolve(); // Don't reject on close errors, just resolve
+      }
+    });
+  };
+
   return {
     async upload(file: StrapiFile, options: UploadOptions = {}): Promise<void> {
       const key = getKey(file);
+      let uploadStream: any = null;
 
       try {
         // Check if bucket exists, create if not
-        const bucketExists = await client.bucketExists(bucket);
-        if (!bucketExists) {
-          await client.makeBucket(bucket, config.region || "us-east-1");
-
-          // Set public policy if not private
-          if (!options.isPrivate) {
-            const policy = {
-              Version: "2012-10-17",
-              Statement: [
-                {
-                  Effect: "Allow",
-                  Principal: { AWS: "*" },
-                  Action: ["s3:GetObject"],
-                  Resource: [`arn:aws:s3:::${bucket}/*`],
-                },
-              ],
-            };
-            await client.setBucketPolicy(bucket, JSON.stringify(policy));
-          }
-        }
+        await ensureBucket(options.isPrivate);
 
         // Prepare metadata
         const metadata = {
           "Content-Type": file.mime,
-          "Content-Disposition": `inline; filename="${file.name}"`,
+          "Content-Disposition": `inline; filename="${encodeURIComponent(file.name)}"`,
           "Cache-Control": "max-age=31536000",
           ...(file.alternativeText && {
-            "x-amz-meta-alt-text": file.alternativeText,
+            "x-amz-meta-alt-text": encodeURIComponent(file.alternativeText),
           }),
-          ...(file.caption && { "x-amz-meta-caption": file.caption }),
+          ...(file.caption && { 
+            "x-amz-meta-caption": encodeURIComponent(file.caption) 
+          }),
         };
 
         // File upload
         let uploadResult;
         if (file.stream) {
+          uploadStream = file.stream;
           uploadResult = await client.putObject(
             bucket,
             key,
@@ -89,9 +148,6 @@ export function init(config: MinIOConfig) {
             file.size,
             metadata,
           );
-          if (typeof file.stream.close === "function") {
-            file.stream.close();
-          }
         } else if (file.buffer) {
           uploadResult = await client.putObject(
             bucket,
@@ -112,12 +168,23 @@ export function init(config: MinIOConfig) {
           region: config.region,
           etag: uploadResult.etag,
         };
+
       } catch (error) {
         let message = "MinIO upload failed";
         if (error && typeof error === "object" && "message" in error) {
           message += `: ${(error as any).message}`;
         }
         throw new Error(message);
+      } finally {
+        // Always ensure stream is properly closed
+        if (uploadStream) {
+          try {
+            await closeStream(uploadStream);
+          } catch (closeError) {
+            console.warn('Warning: Failed to close upload stream:', closeError);
+            // Don't throw here, just log the warning
+          }
+        }
       }
     },
 

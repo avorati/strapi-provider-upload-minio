@@ -1,6 +1,6 @@
 {
   "name": "@avorati/strapi-provider-upload-minio",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "MinIO provider for Strapi Upload",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
