@@ -10,6 +10,7 @@ export interface MinIOConfig {
   region?: string;
   folder?: string;
   baseUrl?: string;
+  publicPolicy?: boolean; // Adicionado
 }
 
 export interface StrapiFile {
@@ -30,6 +31,7 @@ export interface StrapiFile {
   stream?: ReadStream;
   buffer?: Buffer;
   path?: string;
+  metadata?: Record<string, any>; // Adicionado
 }
 
 export interface UploadOptions {

@@ -1,59 +1,77 @@
 import { Client } from "minio";
 import { MinIOConfig, StrapiFile, UploadOptions } from "./index.types";
-import { ReadStream } from "node:fs";
-const mime = require("mime-types");
+import mime from "mime-types";
+
+// Cache global para buckets verificados
+const bucketCache = new Set<string>();
+
+// Type guard para erros do MinIO
+function isMinioError(error: unknown): error is { code: string; message: string } {
+  return typeof error === "object" && error !== null && "code" in error;
+}
 
 export function init(config: MinIOConfig) {
-  // Validação de configuração com mensagens específicas
-  if (!config.endPoint || !config.accessKey || !config.secretKey || !config.bucket) {
-    throw new Error("MinIO provider requires endPoint, accessKey, secretKey, and bucket");
+  // Validação rigorosa da configuração
+  const requiredConfig = [
+    "endPoint",
+    "accessKey",
+    "secretKey",
+    "bucket"
+  ];
+
+  const missingConfig = requiredConfig.filter(key => !(key in config));
+  
+  if (missingConfig.length > 0) {
+    throw new Error(
+      `MinIO provider missing required configuration: ${missingConfig.join(", ")}`
+    );
   }
+
+  // Configuração simplificada da porta
+  const port = config.port ?? (config.useSSL ? 443 : 80);
 
   // Inicialização do cliente MinIO
   const client = new Client({
     endPoint: config.endPoint,
-    port: config.port || (config.useSSL ? 443 : 80),
-    useSSL: config.useSSL || false,
+    port: port,
+    useSSL: config.useSSL ?? false,
     accessKey: config.accessKey,
     secretKey: config.secretKey,
     region: config.region || "us-east-1",
   });
 
-  const bucket = config.bucket;
+  const { bucket } = config;
   const folder = config.folder || "";
-  const baseUrl =
-    config.baseUrl ||
-    `${config.useSSL ? "https" : "http"}://${config.endPoint}${
-      config.port && config.port !== (config.useSSL ? 443 : 80)
-        ? `:${config.port}`
-        : ""
-    }`;
+  
+  // Construção da URL base
+  const shouldIncludePort = port && port !== (config.useSSL ? 443 : 80);
+  const baseUrl = config.baseUrl || 
+    `${config.useSSL ? "https" : "http"}://${config.endPoint}${shouldIncludePort ? `:${port}` : ""}`;
 
-  // Cache para verificar existência do bucket
-  let bucketExistsCache: boolean | null = null;
-
-  // Gera o caminho do arquivo no bucket
+  // Geração do caminho do arquivo
   const getKey = (file: StrapiFile): string => {
-    // Remove barra final do folder, se houver
-    const cleanFolder = folder.replace(/\/+$/, "");
-    if (cleanFolder) {
-      return `${cleanFolder}/${file.hash}${file.ext}`;
-    }
-    return `${file.hash}${file.ext}`;
+    const pathChunk = "";
+    const path = folder ? `${folder}/${pathChunk}` : pathChunk;
+    return `${path}${file.hash}${file.ext}`.replace(/\/\//g, "/");
   };
 
-  // Gera a URL pública do arquivo
+  // Geração da URL pública
   const getUrl = (key: string): string => {
     return `${baseUrl}/${bucket}/${key}`;
   };
 
-  // Garante que o bucket existe e está configurado
+  // Verificação e criação do bucket com cache
   const ensureBucket = async (isPrivate: boolean = false): Promise<void> => {
-    if (bucketExistsCache === null) {
-      const exists = await client.bucketExists(bucket);
-      if (!exists) {
+    if (bucketCache.has(bucket)) return;
+
+    try {
+      const bucketExists = await client.bucketExists(bucket);
+      
+      if (!bucketExists) {
         await client.makeBucket(bucket, config.region || "us-east-1");
-        if (!isPrivate) {
+
+        // Aplicar política pública se necessário
+        if (!isPrivate && config.publicPolicy !== false) {
           const policy = {
             Version: "2012-10-17",
             Statement: [
@@ -68,43 +86,56 @@ export function init(config: MinIOConfig) {
           await client.setBucketPolicy(bucket, JSON.stringify(policy));
         }
       }
-      bucketExistsCache = true;
+      
+      bucketCache.add(bucket);
+    } catch (error) {
+      let message = "Bucket verification failed";
+      
+      if (isMinioError(error)) {
+        message += ` [${error.code}]: ${error.message}`;
+      } else if (error instanceof Error) {
+        message += `: ${error.message}`;
+      }
+      
+      throw new Error(message);
     }
   };
 
   return {
-    // Faz upload do arquivo para o MinIO
     async upload(file: StrapiFile, options: UploadOptions = {}): Promise<void> {
+      // Validação do arquivo
+      if (!file.stream && !file.buffer) {
+        throw new Error("File must have either stream or buffer");
+      }
+      
+      if (file.stream && !file.size) {
+        throw new Error("File size is required for stream uploads");
+      }
+
       const key = getKey(file);
 
       try {
         await ensureBucket(options.isPrivate);
 
+        // Metadados aprimorados
         const metadata = {
           "Content-Type": mime.lookup(file.ext) || "application/octet-stream",
-          "Content-Disposition": `inline; filename=\"${file.name}\"`
+          "Original-Filename": encodeURIComponent(file.name),
+          ...(file.metadata || {}),
         };
 
-        const uploadData: ReadStream | Buffer | undefined =
-          file.stream || file.buffer;
-        if (!uploadData) {
-          throw new Error("File must have either stream or buffer");
-        }
+        // Determinar conteúdo e tamanho
+        const uploadData = file.stream || file.buffer!;
+        const uploadSize = file.buffer ? file.buffer.length : file.size!;
 
-        // Valida o tamanho para streams
-        if (file.stream && typeof file.size !== "number") {
-          throw new Error("File size must be provided for stream uploads");
-        }
-
-        const uploadSize: number = file.buffer ? file.buffer.length : file.size;
-
-        // Tratamento de erro para streams
+        // Handler de erro para streams
         if (file.stream) {
           file.stream.on("error", (err) => {
             console.error("Stream error during upload:", err);
           });
         }
 
+        // Upload para o MinIO
         const uploadResult = await client.putObject(
           bucket,
           key,
@@ -113,26 +144,29 @@ export function init(config: MinIOConfig) {
           metadata
         );
 
+        // Atualizar metadados do arquivo
         file.url = options.isPrivate ? undefined : getUrl(key);
         file.provider_metadata = {
+          ...(file.provider_metadata || {}),
           key,
           bucket,
           region: config.region,
-          etag:
-            typeof uploadResult === "string"
-              ? uploadResult
-              : uploadResult?.etag,
+          etag: uploadResult.etag,
+          versionId: uploadResult.versionId || null,
         };
       } catch (error) {
-        let message = "MinIO upload failed";
-        if (error && typeof error === "object" && "message" in error) {
-          message += `: ${(error as any).message}`;
+        let message = `Upload failed for ${file.name || 'unknown file'}`;
+        
+        if (isMinioError(error)) {
+          message += ` [${error.code}]: ${error.message}`;
+        } else if (error instanceof Error) {
+          message += `: ${error.message}`;
         }
+        
         throw new Error(message);
       }
     },
 
-    // Faz upload de streams (reutiliza a função upload)
     async uploadStream(
       file: StrapiFile,
       options: UploadOptions = {}
@@ -140,51 +174,86 @@ export function init(config: MinIOConfig) {
       return this.upload(file, options);
     },
 
-    // Remove o arquivo do bucket
     async delete(file: StrapiFile): Promise<void> {
       const key = file.provider_metadata?.key || getKey(file);
+
       try {
         await client.removeObject(bucket, key);
-      } catch (error) {
-        let message = "MinIO delete failed";
-        if (error && typeof error === "object" && "message" in error) {
-          message += `: ${(error as any).message}`;
+        
+        // Limpar metadados
+        if (file.provider_metadata) {
+          file.provider_metadata.key = '';
+          file.url = '';
         }
+      } catch (error) {
+        let message = `Delete failed for ${file.name || 'unknown file'}`;
+        
+        if (isMinioError(error)) {
+          message += ` [${error.code}]: ${error.message}`;
+        } else if (error instanceof Error) {
+          message += `: ${error.message}`;
+        }
+        
         throw new Error(message);
       }
     },
 
-    // Verifica o tamanho do arquivo
     async checkFileSize(
       file: StrapiFile,
       { sizeLimit }: { sizeLimit: number }
     ): Promise<void> {
+      if (!file.size) {
+        throw new Error("File size is unknown");
+      }
+      
       if (file.size > sizeLimit) {
-        throw new Error(`File size exceeds limit of ${sizeLimit} bytes`);
+        throw new Error(
+          `File size (${file.size} bytes) exceeds limit of ${sizeLimit} bytes`
+        );
       }
     },
 
-    // Gera uma URL assinada para acesso temporário
     async getSignedUrl(
       file: StrapiFile,
       options: { expiresIn?: number } = {}
     ): Promise<string> {
       const key = file.provider_metadata?.key || getKey(file);
-      const expiry = options.expiresIn || 3600;
+      const expiry = options.expiresIn || 3600; // 1 hora padrão
+
       try {
         return await client.presignedGetObject(bucket, key, expiry);
       } catch (error) {
-        let message = "MinIO signed URL generation failed";
-        if (error && typeof error === "object" && "message" in error) {
-          message += `: ${(error as any).message}`;
+        let message = "Signed URL generation failed";
+        
+        if (isMinioError(error)) {
+          message += ` [${error.code}]: ${error.message}`;
+        } else if (error instanceof Error) {
+          message += `: ${error.message}`;
         }
+        
         throw new Error(message);
       }
     },
 
-    // Define se o bucket é privado (padrão: false)
+    async healthCheck(): Promise<{ status: boolean; message?: string }> {
+      try {
+        await client.listBuckets();
+        return { status: true };
+      } catch (error) {
+        let message = "MinIO connection failed";
+        
+        if (isMinioError(error)) {
+          message += ` [${error.code}]: ${error.message}`;
+        } else if (error instanceof Error) {
+          message += `: ${error.message}`;
+        }
+        
+        return { status: false, message };
+      }
+    },
+
     async isPrivate(): Promise<boolean> {
-      return false;
+      return config.publicPolicy === false;
     },
   };
 }
