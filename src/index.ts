@@ -89,6 +89,9 @@ export function init(config: MinIOConfig) {
             file.size,
             metadata,
           );
+          if (typeof file.stream.close === "function") {
+            file.stream.close();
+          }
         } else if (file.buffer) {
           uploadResult = await client.putObject(
             bucket,
