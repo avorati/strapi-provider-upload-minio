@@ -29,6 +29,7 @@ export interface StrapiFile {
   provider_metadata?: Record<string, any>;
   stream?: ReadStream;
   buffer?: Buffer;
+  path?: string;
 }
 
 export interface UploadOptions {
