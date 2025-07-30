@@ -1,4 +1,4 @@
-import type { ReadStream } from "fs";
+import { ReadStream } from "fs";
 
 export interface MinIOConfig {
   endPoint: string;
@@ -10,7 +10,7 @@ export interface MinIOConfig {
   region?: string;
   folder?: string;
   baseUrl?: string;
-  publicPolicy?: boolean; // Adicionado
+  publicPolicy?: boolean;
 }
 
 export interface StrapiFile {
@@ -31,7 +31,31 @@ export interface StrapiFile {
   stream?: ReadStream;
   buffer?: Buffer;
   path?: string;
-  metadata?: Record<string, any>; // Adicionado
+  metadata?: Record<string, any>;
+}
+
+export interface ProviderOptions {
+  endPoint: string;
+  port?: number;
+  useSSL?: boolean | string;
+  accessKey: string;
+  secretKey: string;
+  bucket: string;
+  folder?: string;
+  private?: boolean | string;
+  expiry?: number;
+}
+
+export interface SignedUrlResponse {
+  url: string;
+}
+
+export interface StrapiProvider {
+  uploadStream(file: StrapiFile): Promise<void>;
+  upload(file: StrapiFile): Promise<void>;
+  delete(file: StrapiFile): Promise<void>;
+  isPrivate(): boolean;
+  getSignedUrl(file: StrapiFile): Promise<SignedUrlResponse>;
 }
 
 export interface UploadOptions {

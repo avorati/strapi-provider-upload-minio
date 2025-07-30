@@ -1,226 +1,229 @@
-import { Client } from "minio";
-import { MinIOConfig, StrapiFile, UploadOptions } from "./index.types";
-import mime from "mime-types";
+import { Client as MinioClient } from 'minio';
+import { lookup as getMimeType } from 'mime-types';
+import { Readable } from 'stream';
+import { ProviderOptions, SignedUrlResponse, StrapiFile, StrapiProvider } from './index.types';
 
-// Cache global para buckets verificados (desabilitado para testes)
-// const bucketCache = new Set<string>();
+const DEFAULT_PORT = 9000;
+const DEFAULT_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
+const DEFAULT_MIME_TYPE = 'application/octet-stream';
 
-// Type guard para erros do MinIO
-function isMinioError(error: unknown): error is { code: string; message: string } {
-  return typeof error === "object" && error !== null && "code" in error;
-}
+class MinioProvider implements StrapiProvider {
+  private readonly client: MinioClient;
+  private readonly config: Required<Omit<ProviderOptions, 'useSSL' | 'private'>> & {
+    useSSL: boolean;
+    private: boolean;
+  };
 
-export function init(config: MinIOConfig) {
-  // Validação rigorosa da configuração
-  const requiredConfig = [
-    "endPoint",
-    "accessKey",
-    "secretKey",
-    "bucket"
-  ];
-
-  const missingConfig = requiredConfig.filter(key => !(key in config));
-  if (missingConfig.length > 0) {
-    throw new Error("MinIO provider requires endPoint, accessKey, secretKey, and bucket");
+  constructor(options: ProviderOptions) {
+    this.config = this.normalizeConfig(options);
+    this.client = this.createMinioClient();
   }
 
-  // Configuração simplificada da porta
-  const port = config.port ?? (config.useSSL ? 443 : 80);
+  private normalizeConfig(options: ProviderOptions): Required<Omit<ProviderOptions, 'useSSL' | 'private'>> & {
+    useSSL: boolean;
+    private: boolean;
+  } {
+    return {
+      endPoint: options.endPoint,
+      port: options.port || DEFAULT_PORT,
+      useSSL: this.parseBoolean(options.useSSL),
+      accessKey: options.accessKey,
+      secretKey: options.secretKey,
+      bucket: options.bucket,
+      folder: options.folder || '',
+      private: this.parseBoolean(options.private),
+      expiry: options.expiry || DEFAULT_EXPIRY,
+    };
+  }
 
-  // Inicialização do cliente MinIO
-  const client = new Client({
-    endPoint: config.endPoint,
-    port: port,
-    useSSL: config.useSSL ?? false,
-    accessKey: config.accessKey,
-    secretKey: config.secretKey,
-    region: config.region || "us-east-1",
-  });
+  private parseBoolean(value: boolean | string | undefined): boolean {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') return value.toLowerCase() === 'true';
+    return false;
+  }
 
-  const { bucket } = config;
-  const folder = config.folder || "";
-  
-  // Construção da URL base
-  const shouldIncludePort = port && port !== (config.useSSL ? 443 : 80);
-  const baseUrl = config.baseUrl || 
-    `${config.useSSL ? "https" : "http"}://${config.endPoint}${shouldIncludePort ? `:${port}` : ""}`;
+  private createMinioClient(): MinioClient {
+    return new MinioClient({
+      endPoint: this.config.endPoint,
+      port: this.config.port,
+      useSSL: this.config.useSSL, // Now properly typed as boolean
+      accessKey: this.config.accessKey,
+      secretKey: this.config.secretKey,
+    });
+  }
 
-  // Geração do caminho do arquivo
-  const getKey = (file: StrapiFile): string => {
-    const pathChunk = "";
-    const path = folder ? `${folder}/${pathChunk}` : pathChunk;
-    return `${path}${file.hash}${file.ext}`.replace(/\/\//g, "/");
-  };
-
-  // Geração da URL pública
-  const getUrl = (key: string): string => {
-    return `${baseUrl}/${bucket}/${key}`;
-  };
-
-  // Verificação e criação do bucket com cache
-  const ensureBucket = async (isPrivate: boolean = false): Promise<void> => {
-    // if (bucketCache.has(bucket)) return;
-    try {
-      const bucketExists = await client.bucketExists(bucket);
-      if (!bucketExists) {
-        await client.makeBucket(bucket, config.region || "us-east-1");
-        // Aplicar política pública se necessário
-        if (!isPrivate && config.publicPolicy !== false) {
-          const policy = {
-            Version: "2012-10-17",
-            Statement: [
-              {
-                Effect: "Allow",
-                Principal: { AWS: "*" },
-                Action: ["s3:GetObject"],
-                Resource: [`arn:aws:s3:::${bucket}/*`],
-              },
-            ],
-          };
-          await client.setBucketPolicy(bucket, JSON.stringify(policy));
-        }
-      }
-      // bucketCache.add(bucket);
-    } catch (error) {
-      let message = "Bucket verification failed";
-      if (isMinioError(error)) {
-        message += ` [${error.code}]: ${error.message}`;
-      } else if (error instanceof Error) {
-        message += `: ${error.message}`;
-      }
-      throw new Error(message);
+  private buildUploadPath(file: StrapiFile): string {
+    const pathSegments: string[] = [];
+    
+    if (this.config.folder) {
+      pathSegments.push(this.config.folder);
     }
-  };
+    
+    if (file.path) {
+      pathSegments.push(file.path);
+    }
+    
+    pathSegments.push(`${file.hash}${file.ext}`);
+    
+    return pathSegments.join('/');
+  }
 
-  return {
-    async upload(file: StrapiFile, options: UploadOptions = {}): Promise<void> {
-      // Validação do arquivo
-      if (!file.stream && !file.buffer) {
-        throw new Error("File must have either stream or buffer");
-      }
+  private buildHostUrl(): string {
+    const protocol = this.config.useSSL ? 'https://' : 'http://';
+    const shouldIncludePort = this.shouldIncludePortInUrl();
+    const portSuffix = shouldIncludePort ? `:${this.config.port}` : '';
+    
+    return `${protocol}${this.config.endPoint}${portSuffix}/`;
+  }
+
+  private shouldIncludePortInUrl(): boolean {
+    const { port, useSSL } = this.config;
+    
+    if (useSSL && (port === 443 || port === 80)) {
+      return false;
+    }
+    
+    if (!useSSL && port === 80) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  private extractFilePathFromUrl(file: StrapiFile): string {
+    if (!file.url) {
+      throw new Error('File URL is required for path extraction');
+    }
+
+    const hostUrl = this.buildHostUrl();
+    const bucketPrefix = `${hostUrl}${this.config.bucket}/`;
+    
+    return file.url.replace(bucketPrefix, '');
+  }
+
+  private createMetadata(file: StrapiFile): Record<string, string> {
+    const contentType = getMimeType(file.ext) || DEFAULT_MIME_TYPE;
+    
+    return {
+      'Content-Type': contentType,
+    };
+  }
+
+  private createFileUrl(uploadPath: string): string {
+    const hostUrl = this.buildHostUrl();
+    return `${hostUrl}${this.config.bucket}/${uploadPath}`;
+  }
+
+  private getFileContent(file: StrapiFile): Readable | Buffer {
+    if (file.stream) {
+      return file.stream;
+    }
+    
+    if (file.buffer) {
+      // Fix: Don't pass 'binary' as second parameter to Buffer.from when buffer is already a Buffer
+      return file.buffer;
+    }
+    
+    throw new Error('File must have either stream or buffer property');
+  }
+
+  private isFileFromSameBucket(file: StrapiFile): boolean {
+    if (!file.url) {
+      return false;
+    }
+
+    try {
+      const url = new URL(file.url);
+      const isSameHost = url.hostname === this.config.endPoint;
+      const isFromBucket = url.pathname.startsWith(`/${this.config.bucket}/`);
       
-      if (file.stream && !file.size) {
-        throw new Error("File size is required for stream uploads");
-      }
+      return isSameHost && isFromBucket;
+    } catch {
+      return false;
+    }
+  }
 
-      const key = getKey(file);
+  public async uploadStream(file: StrapiFile): Promise<void> {
+    return this.upload(file);
+  }
 
+  public async upload(file: StrapiFile): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const uploadPath = this.buildUploadPath(file);
+      const metadata = this.createMetadata(file);
+      const content = this.getFileContent(file);
+
+      // putObject: bucket, objectName, stream|buffer, size, metaData
+      this.client.putObject(
+        this.config.bucket,
+        uploadPath,
+        content,
+        file.size,
+        metadata
+      ).then(() => {
+        file.url = this.createFileUrl(uploadPath);
+        resolve();
+      }).catch((error: Error) => {
+        reject(new Error(`Failed to upload file: ${error.message}`));
+      });
+    });
+  }
+
+  public async delete(file: StrapiFile): Promise<void> {
+    return new Promise((resolve, reject) => {
       try {
-        await ensureBucket(options.isPrivate);
-
-        // Metadados conforme esperado pelo teste
-        const metadata = {
-          "Content-Type": mime.lookup(file.ext) || "application/octet-stream",
-          "Content-Disposition": `inline; filename=\"${file.name}\"`
-        };
-
-        // Determinar conteúdo e tamanho
-        const uploadData = file.stream || file.buffer!;
-        const uploadSize = file.buffer ? file.buffer.length : file.size!;
-
-        // Handler de erro para streams
-        if (file.stream) {
-          file.stream.on("error", (err) => {
-            console.error("Stream error during upload:", err);
-          });
-        }
-
-        // Upload para o MinIO
-        const uploadResult = await client.putObject(
-          bucket,
-          key,
-          uploadData,
-          uploadSize,
-          metadata
-        );
-
-        // Atualizar metadados do arquivo
-        file.url = options.isPrivate ? undefined : getUrl(key);
-        file.provider_metadata = {
-          key,
-          bucket,
-          region: config.region,
-          etag: uploadResult.etag,
-        };
+        const filePath = this.extractFilePathFromUrl(file);
+        // removeObject: bucket, objectName
+        this.client.removeObject(
+          this.config.bucket,
+          filePath
+        ).then(() => {
+          resolve();
+        }).catch((error: Error) => {
+          reject(new Error(`Failed to delete file: ${error.message}`));
+        });
       } catch (error) {
-        let message = "MinIO upload failed";
-        if (error && typeof error === "object" && "message" in error) {
-          message += `: ${(error as any).message}`;
-        }
-        throw new Error(message);
+        reject(new Error(`Failed to extract file path: ${error instanceof Error ? error.message : 'Unknown error'}`));
       }
-    },
+    });
+  }
 
-    async uploadStream(
-      file: StrapiFile,
-      options: UploadOptions = {}
-    ): Promise<void> {
-      return this.upload(file, options);
-    },
+  public isPrivate(): boolean {
+    return this.config.private;
+  }
 
-    async delete(file: StrapiFile): Promise<void> {
-      const key = file.provider_metadata?.key || getKey(file);
+  public async getSignedUrl(file: StrapiFile): Promise<SignedUrlResponse> {
+    if (!file.url) {
+      throw new Error('File URL is required for signed URL generation');
+    }
 
+    return new Promise((resolve, reject) => {
+      // If file is not from the same bucket, return the original URL
+      if (!this.isFileFromSameBucket(file)) {
+        return resolve({ url: file.url! });
+      }
       try {
-        await client.removeObject(bucket, key);
+        const filePath = this.extractFilePathFromUrl(file);
+        // presignedGetObject: bucket, objectName, expiry
+        this.client.presignedGetObject(
+          this.config.bucket,
+          filePath,
+          this.config.expiry
+        ).then((presignedUrl: string) => {
+          resolve({ url: presignedUrl });
+        }).catch((error: Error) => {
+          reject(new Error(`Failed to generate signed URL: ${error.message}`));
+        });
       } catch (error) {
-        let message = "MinIO delete failed";
-        if (error && typeof error === "object" && "message" in error) {
-          message += `: ${(error as any).message}`;
-        }
-        throw new Error(message);
+        reject(new Error(`Failed to process signed URL request: ${error instanceof Error ? error.message : 'Unknown error'}`));
       }
-    },
-
-    async checkFileSize(
-      file: StrapiFile,
-      { sizeLimit }: { sizeLimit: number }
-    ): Promise<void> {
-      if (!file.size) {
-        throw new Error("File size is unknown");
-      }
-      if (file.size > sizeLimit) {
-        throw new Error(`File size exceeds limit of ${sizeLimit} bytes`);
-      }
-    },
-
-    async getSignedUrl(
-      file: StrapiFile,
-      options: { expiresIn?: number } = {}
-    ): Promise<string> {
-      const key = file.provider_metadata?.key || getKey(file);
-      const expiry = options.expiresIn || 3600; // 1 hora padrão
-
-      try {
-        return await client.presignedGetObject(bucket, key, expiry);
-      } catch (error) {
-        let message = "MinIO signed URL generation failed";
-        if (error && typeof error === "object" && "message" in error) {
-          message += `: ${(error as any).message}`;
-        }
-        throw new Error(message);
-      }
-    },
-
-    async healthCheck(): Promise<{ status: boolean; message?: string }> {
-      try {
-        await client.listBuckets();
-        return { status: true };
-      } catch (error) {
-        let message = "MinIO connection failed";
-        
-        if (isMinioError(error)) {
-          message += ` [${error.code}]: ${error.message}`;
-        } else if (error instanceof Error) {
-          message += `: ${error.message}`;
-        }
-        
-        return { status: false, message };
-      }
-    },
-
-    async isPrivate(): Promise<boolean> {
-      return config.publicPolicy === false;
-    },
-  };
+    });
+  }
 }
+
+// Factory function for Strapi
+export = {
+  init(providerOptions: ProviderOptions): StrapiProvider {
+    return new MinioProvider(providerOptions);
+  },
+};
