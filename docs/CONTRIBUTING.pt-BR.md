@@ -167,15 +167,78 @@ npm run format:check
 
 ### Commits
 
-Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
+Seguimos [Conventional Commits](https://www.conventionalcommits.org/) para gerar releases automáticas:
+
+#### Tipos de Commit que Geram Release
+
+**Major (X.0.0) - Breaking Changes:**
+```bash
+feat!: remove deprecated API
+# ou
+feat(api)!: remove deprecated endpoint
+
+BREAKING CHANGE: API foi refatorada completamente
+```
+
+**Minor (0.X.0) - Novas Features:**
+```bash
+feat: add support for custom expiry in signed URLs
+feat(provider): add support for custom metadata
+```
+
+**Patch (0.0.X) - Correções:**
+```bash
+fix: resolve bucket creation error
+fix(url-builder): correct port handling for HTTPS
+perf: optimize file upload streaming
+refactor: improve error handling
+```
+
+#### Tipos que NÃO Geram Release
 
 ```bash
-# Exemplos
-feat: add support for custom metadata
-fix: resolve bucket creation error
 docs: update installation guide
-refactor: improve error handling
+style: fix code formatting
+chore: update dependencies
 test: add upload integration tests
+build: update TypeScript configuration
+ci: add semantic-release workflow
+```
+
+#### Formato do Commit
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Exemplos:**
+
+```bash
+# Feature (Minor Release)
+feat: add support for custom expiry in signed URLs
+
+Permite que usuários especifiquem tempo de expiração customizado
+ao gerar URLs assinadas.
+
+# Bug Fix (Patch Release)
+fix(url-builder): corrige tratamento de porta para HTTPS
+
+Corrigido problema onde porta 80 era incorretamente omitida
+para conexões HTTPS.
+
+# Breaking Change (Major Release)
+feat!: refatora configuração do provider
+
+BREAKING CHANGE: Opções de configuração foram reestruturadas.
+A opção `region` foi removida. Use `endPoint` ao invés.
+
+Guia de migração:
+- Remova `region` da sua configuração
+- Garanta que `endPoint` está configurado corretamente
 ```
 
 ### Estrutura de Arquivos
@@ -191,21 +254,36 @@ src/
 
 ## 📦 Versionamento
 
-Usamos [Semantic Versioning](https://semver.org/):
+Usamos [Semantic Versioning](https://semver.org/) com releases automáticas:
 
-- **PATCH** (1.0.1): Bug fixes
-- **MINOR** (1.1.0): Novas funcionalidades (compatível)
-- **MAJOR** (2.0.0): Mudanças breaking
+- **PATCH** (1.0.1): Bug fixes, melhorias de performance, refatorações
+- **MINOR** (1.1.0): Novas funcionalidades (compatível com versões anteriores)
+- **MAJOR** (2.0.0): Mudanças breaking (quebra compatibilidade)
 
-## 🚀 Processo de Release
+## 🚀 Processo de Release Automático
 
-1. Mudanças são mergeadas na `main`
-2. CI executa testes e build
-3. Semantic Release automaticamente:
-   - Analisa commits
-   - Gera CHANGELOG
-   - Cria tag/release
-   - Publica no npm
+Quando você faz push de commits para `main`:
+
+1. **CI executa testes e build**
+2. **Semantic Release analisa seus commits** usando Conventional Commits
+3. **Determina a próxima versão** baseado nos tipos de commit:
+   - `feat:` → Minor (0.X.0)
+   - `fix:`, `perf:`, `refactor:` → Patch (0.0.X)
+   - `feat!:` ou `BREAKING CHANGE:` → Major (X.0.0)
+4. **Atualiza automaticamente:**
+   - `CHANGELOG.md` com as mudanças
+   - `package.json` com a nova versão
+5. **Cria tag Git** com a versão
+6. **Publica no NPM** automaticamente
+7. **Cria GitHub Release** com o changelog completo
+
+### Pular CI
+
+Para commits que não devem gerar release (ex: apenas documentação):
+
+```bash
+docs: atualiza README [skip ci]
+```
 
 ## 📚 Recursos Úteis
 
