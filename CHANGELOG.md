@@ -19,14 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MinIO provider for Strapi v5
 - Public and private file uploads
 - Signed URL generation
-- Automatic bucket creation
+- Bucket existence validation with warnings (non-blocking)
 - Large file streaming support
-- Custom metadata configuration
+- Custom metadata configuration (alternativeText, caption, custom metadata)
 - Full TypeScript support
 - Unit and integration tests
 - Complete documentation
 - CI/CD pipeline
-- Automatic bucket policy configuration
 
 ### Security
 - Required configuration validation

@@ -8,6 +8,8 @@
 [![npm version](https://img.shields.io/npm/v/@avorati/strapi-provider-upload-minio.svg)](https://www.npmjs.com/package/@avorati/strapi-provider-upload-minio)
 [![npm downloads](https://img.shields.io/npm/dm/@avorati/strapi-provider-upload-minio.svg)](https://www.npmjs.com/package/@avorati/strapi-provider-upload-minio)
 
+> 📖 [Read in Portuguese](docs/README.pt-BR.md) | [Leia em Português](docs/README.pt-BR.md)
+
 Upload provider for Strapi v5 that allows storing files in MinIO (S3-compatible storage).
 
 ## ✨ Features
@@ -16,7 +18,7 @@ Upload provider for Strapi v5 that allows storing files in MinIO (S3-compatible 
 - ✅ Full MinIO support
 - ✅ Public and private file uploads
 - ✅ Signed URLs for private files
-- ✅ Automatic bucket configuration
+- ✅ Folder configuration support
 - ✅ Custom metadata
 - ✅ TypeScript support
 - ✅ Large file streaming
@@ -47,9 +49,7 @@ export default {
         accessKey: process.env.MINIO_ACCESS_KEY,
         secretKey: process.env.MINIO_SECRET_KEY,
         bucket: process.env.MINIO_BUCKET || 'strapi-uploads',
-        region: process.env.MINIO_REGION || 'us-east-1',
         folder: process.env.MINIO_FOLDER || '', // optional
-        baseUrl: process.env.MINIO_BASE_URL, // optional, auto-generated if not provided
       },
     },
   },
@@ -57,6 +57,12 @@ export default {
 ```
 
 ### 2. Environment variables
+
+Copy the `.env.example` file to `.env` and fill in your actual values:
+
+```bash
+cp .env.example .env
+```
 
 Add the following variables to your `.env` file:
 
@@ -67,10 +73,12 @@ MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=strapi-uploads
-MINIO_REGION=us-east-1
 MINIO_FOLDER=uploads
-MINIO_BASE_URL=http://localhost:9000
+MINIO_PRIVATE=false
+MINIO_EXPIRY=604800
 ```
+
+> **Note:** See `.env.example` for a complete template with descriptions of all available options.
 
 ## 🚀 Usage
 
@@ -114,9 +122,9 @@ await strapi.plugin('upload').provider.upload(file, {
 | `accessKey` | string | ✅       | MinIO access key                            |
 | `secretKey` | string | ✅       | MinIO secret key                            |
 | `bucket`    | string | ✅       | Bucket name to store files                  |
-| `region`    | string | ❌       | Bucket region (default: 'us-east-1')        |
 | `folder`    | string | ❌       | Folder inside the bucket (optional)         |
-| `baseUrl`   | string | ❌       | Custom base URL for public files            |
+| `private`   | boolean| ❌       | Enable private file uploads (default: false) |
+| `expiry`    | number | ❌       | Signed URL expiry in seconds (default: 604800 = 7 days) |
 
 ## 🐳 Docker Compose - MinIO for development
 
@@ -202,13 +210,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING.md) for details.
 
-1. Fork the repository
-2. Create a branch for your feature (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+For information about the release process, see [Release Process](docs/RELEASE.md).
 
 ## 📞 Support
 
