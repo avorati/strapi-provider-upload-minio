@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.1...v1.4.2) (2025-11-24)
+
+
+### Bug Fixes
+
+* remove ES module export to ensure CommonJS compatibility with Strapi ([74473ba](https://github.com/avorati/strapi-provider-upload-minio/commit/74473ba9f40ea2f114cc5a43a20a873941795beb))
+
 ## [1.4.1](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.0...v1.4.1) (2025-11-24)
 
 
