@@ -131,6 +131,7 @@ export function buildUploadPath(
 /**
  * Extracts the file path from a MinIO URL
  * Removes query string parameters and URL fragments to get only the file path
+ * This function is more tolerant and can extract paths even when hostUrl doesn't match exactly
  */
 export function extractFilePathFromUrl(
   url: string,
@@ -156,10 +157,69 @@ export function extractFilePathFromUrl(
     decodedUrl = decodedUrl.substring(0, fragmentIndex);
   }
 
-  // Extract the file path by removing the bucket prefix
-  const bucketPrefix = `${hostUrl}${bucket}/`;
-  const filePath = decodedUrl.replace(bucketPrefix, "");
+  try {
+    // Try to parse as URL to get pathname
+    const urlObj = new URL(decodedUrl);
+    const pathname = urlObj.pathname;
 
-  return filePath;
+    // Check if pathname starts with /{bucket}/
+    if (pathname.startsWith(`/${bucket}/`)) {
+      // Extract path after /{bucket}/
+      return pathname.substring(`/${bucket}/`.length);
+    } else if (pathname === `/${bucket}`) {
+      // Edge case: pathname is exactly /{bucket}
+      return "";
+    }
+
+    // Fallback: try to extract using hostUrl prefix (original method)
+    const bucketPrefix = `${hostUrl}${bucket}/`;
+    if (decodedUrl.startsWith(bucketPrefix)) {
+      return decodedUrl.substring(bucketPrefix.length);
+    }
+
+    // If hostUrl doesn't match, try to extract from pathname directly
+    // This handles cases where the URL has a different hostname
+    // but the pathname structure is correct
+    if (pathname.startsWith("/")) {
+      // Remove leading slash and check if first segment is bucket
+      const segments = pathname.substring(1).split("/");
+      if (segments[0] === bucket && segments.length > 1) {
+        // Return path after bucket
+        return segments.slice(1).join("/");
+      }
+    }
+
+    // Last resort: try simple string replacement
+    const filePath = decodedUrl.replace(bucketPrefix, "");
+    if (filePath !== decodedUrl) {
+      return filePath;
+    }
+
+    // If all methods fail, throw error
+    throw new Error(
+      `Could not extract file path from URL. Expected bucket "${bucket}" in pathname.`
+    );
+  } catch (error) {
+    // If URL parsing fails, fall back to simple string manipulation
+    const bucketPrefix = `${hostUrl}${bucket}/`;
+    if (decodedUrl.startsWith(bucketPrefix)) {
+      return decodedUrl.substring(bucketPrefix.length);
+    }
+
+    // Try to find bucket in the URL path
+    const bucketPattern = `/${bucket}/`;
+    const bucketIndex = decodedUrl.indexOf(bucketPattern);
+    if (bucketIndex !== -1) {
+      return decodedUrl.substring(bucketIndex + bucketPattern.length);
+    }
+
+    // Re-throw original error if it was an Error, otherwise throw new one
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(
+      `Could not extract file path from URL: ${decodedUrl}`
+    );
+  }
 }
 
