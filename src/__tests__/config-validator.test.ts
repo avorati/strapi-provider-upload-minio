@@ -63,6 +63,70 @@ describe("config-validator", () => {
       expect(config.expiry).toBe(3600);
     });
 
+    it("should convert string expiry to number", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        expiry: "604800",
+      });
+
+      expect(config.expiry).toBe(604800);
+    });
+
+    it("should convert string port to number", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        port: "9001",
+      });
+
+      expect(config.port).toBe(9001);
+    });
+
+    it("should convert string expiry with whitespace to number", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        expiry: "  3600  ",
+      });
+
+      expect(config.expiry).toBe(3600);
+    });
+
+    it("should convert string port with whitespace to number", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        port: "  9001  ",
+      });
+
+      expect(config.port).toBe(9001);
+    });
+
+    it("should use default expiry when string is not a valid number", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        expiry: "not-a-number",
+      });
+
+      expect(config.expiry).toBe(7 * 24 * 60 * 60); // default 7 days
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid expiry value")
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should use default port when string is not a valid number", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        port: "not-a-number",
+      });
+
+      expect(config.port).toBe(9000); // default port
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid port value")
+      );
+      consoleSpy.mockRestore();
+    });
+
     it("should trim whitespace from string values", () => {
       const config = validateAndNormalizeConfig({
         endPoint: "  localhost  ",
@@ -115,50 +179,70 @@ describe("config-validator", () => {
       }).toThrow(ConfigurationError);
     });
 
-    it("should throw ConfigurationError when port is invalid", () => {
-      expect(() => {
-        validateAndNormalizeConfig({
-          ...validConfig,
-          port: 0,
-        });
-      }).toThrow(ConfigurationError);
+    it("should use default port when port is invalid", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
-      expect(() => {
-        validateAndNormalizeConfig({
-          ...validConfig,
-          port: 65536,
-        });
-      }).toThrow(ConfigurationError);
+      const config1 = validateAndNormalizeConfig({
+        ...validConfig,
+        port: 0,
+      });
+      expect(config1.port).toBe(9000); // default
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Port 0 is out of valid range")
+      );
 
-      expect(() => {
-        validateAndNormalizeConfig({
-          ...validConfig,
-          port: 1.5,
-        });
-      }).toThrow(ConfigurationError);
+      const config2 = validateAndNormalizeConfig({
+        ...validConfig,
+        port: 65536,
+      });
+      expect(config2.port).toBe(9000); // default
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Port 65536 is out of valid range")
+      );
+
+      const config3 = validateAndNormalizeConfig({
+        ...validConfig,
+        port: 1.5,
+      });
+      expect(config3.port).toBe(9000); // default
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Port 1.5 is out of valid range")
+      );
+
+      consoleSpy.mockRestore();
     });
 
-    it("should throw ConfigurationError when expiry is invalid", () => {
-      expect(() => {
-        validateAndNormalizeConfig({
-          ...validConfig,
-          expiry: -1,
-        });
-      }).toThrow(ConfigurationError);
+    it("should use default expiry when expiry is invalid", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
-      expect(() => {
-        validateAndNormalizeConfig({
-          ...validConfig,
-          expiry: 0,
-        });
-      }).toThrow(ConfigurationError);
+      const config1 = validateAndNormalizeConfig({
+        ...validConfig,
+        expiry: -1,
+      });
+      expect(config1.expiry).toBe(7 * 24 * 60 * 60); // default 7 days
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Expiry -1 is invalid")
+      );
 
-      expect(() => {
-        validateAndNormalizeConfig({
-          ...validConfig,
-          expiry: 1.5,
-        });
-      }).toThrow(ConfigurationError);
+      const config2 = validateAndNormalizeConfig({
+        ...validConfig,
+        expiry: 0,
+      });
+      expect(config2.expiry).toBe(7 * 24 * 60 * 60); // default 7 days
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Expiry 0 is invalid")
+      );
+
+      const config3 = validateAndNormalizeConfig({
+        ...validConfig,
+        expiry: 1.5,
+      });
+      expect(config3.expiry).toBe(7 * 24 * 60 * 60); // default 7 days
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Expiry 1.5 is invalid")
+      );
+
+      consoleSpy.mockRestore();
     });
 
     it("should throw ConfigurationError when endPoint is empty after trim", () => {

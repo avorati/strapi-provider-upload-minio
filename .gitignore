@@ -60,3 +60,4 @@ pids
 # Temporary folders
 tmp/
 temp/
+.cursor/rules/*
