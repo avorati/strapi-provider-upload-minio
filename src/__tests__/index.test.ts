@@ -1,7 +1,9 @@
-import defaultExport from "../index";
 import { ProviderOptions } from "../index.types";
 import { MinioProvider } from "../provider/minio-provider";
 import { ConfigurationError } from "../errors/provider-errors";
+
+// Import as CommonJS module (as Strapi does)
+const defaultExport = require("../index");
 
 describe("index", () => {
   const validConfig: ProviderOptions = {
