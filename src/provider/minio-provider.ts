@@ -79,8 +79,13 @@ export class MinioProvider implements StrapiProvider {
     // Only check if not in test environment to avoid test warnings
     if (process.env.NODE_ENV !== "test") {
       process.nextTick(() => {
-        this.checkBucketExists().catch(() => {
-          // Silently ignore errors - we don't want to break Strapi initialization
+        this.checkBucketExists().catch((error) => {
+          // Log connection test error for debugging
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          if (errorMsg.includes("signature") || errorMsg.includes("Signature")) {
+            console.error(`[MINIO-CONNECTION-TEST] Signature error during bucket check:`, errorMsg);
+            console.error(`[MINIO-CONNECTION-TEST] This suggests credentials mismatch. AccessKey: ${config.accessKey.substring(0, 8)}..., Endpoint: ${config.endPoint}:${config.port}`);
+          }
         });
       });
     }
@@ -219,7 +224,7 @@ export class MinioProvider implements StrapiProvider {
       
       if (isDebugEnabled) {
         this.logger.debug(
-          `[strapi-provider-upload-minio] [DEBUG] Upload path generated: "${uploadPath}", folder="${this.config.folder || "(empty)"}"`
+          `[strapi-provider-upload-minio] [DEBUG] Upload path generated: "${uploadPath}", folder="${this.config.folder || "(empty)"}", fileName="${file.name}", hash="${file.hash}", ext="${file.ext}"`
         );
       }
       
@@ -248,34 +253,229 @@ export class MinioProvider implements StrapiProvider {
       // We need to handle the optional size parameter correctly for TypeScript
       const uploadStartTime = Date.now();
       
+      // Ensure path is properly normalized (no encoding issues)
+      // MinIO client should handle encoding, but we ensure clean path
+      const normalizedUploadPath = uploadPath.replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
+      
+      // Calculate path in bytes (UTF-8) for MinIO limits
+      const pathBytes = Buffer.from(normalizedUploadPath, 'utf8').length;
+      const pathBytesFull = Buffer.from(`/${this.config.bucket}/${normalizedUploadPath}`, 'utf8').length;
+      
+      // Always log critical info before upload attempt (even without debug)
+      const criticalInfo = {
+        bucket: this.config.bucket,
+        objectName: normalizedUploadPath,
+        objectNameLength: normalizedUploadPath.length,
+        objectNameBytes: pathBytes,
+        fullPathBytes: pathBytesFull,
+        originalHash: file.hash,
+        originalHashLength: file.hash.length,
+        fileSize: file.size,
+        endpoint: `${this.config.endPoint}:${this.config.port}`,
+        useSSL: this.config.useSSL,
+        accessKeyLength: this.config.accessKey.length,
+        accessKeyPrefix: this.config.accessKey.substring(0, 8),
+        secretKeyLength: this.config.secretKey.length,
+        metadataCount: Object.keys(metadata).length,
+        metadataKeys: Object.keys(metadata),
+      };
+      
+      // Always show critical info (info level, not debug)
+      console.log(`[MINIO-UPLOAD] Starting upload:`, JSON.stringify(criticalInfo, null, 2));
+      this.logger.info(
+        `[strapi-provider-upload-minio] Upload attempt: bucket="${this.config.bucket}", objectName="${normalizedUploadPath}" (${pathBytes} bytes), hash="${file.hash.substring(0, 40)}..."`
+      );
+      
       if (isDebugEnabled) {
         this.logger.debug(
-          `[strapi-provider-upload-minio] [DEBUG] Calling putObject: bucket="${this.config.bucket}", objectName="${uploadPath}", size=${file.size || "auto"}, metadataKeys=${Object.keys(metadata).length}`
+          `[strapi-provider-upload-minio] [DEBUG] ========== PUTOBJECT REQUEST DETAILS ==========`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Critical Info:`,
+          JSON.stringify(criticalInfo, null, 2)
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Bucket: "${this.config.bucket}"`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Object Name: "${normalizedUploadPath}"`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Path Length: ${normalizedUploadPath.length} chars, ${pathBytes} bytes`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Full Path (with bucket): ${pathBytesFull} bytes`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Original Hash: "${file.hash}" (${file.hash.length} chars)`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] File Size: ${file.size} bytes`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Content Type: ${contentType}`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Content Size: ${contentSize}`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Endpoint: ${this.config.endPoint}:${this.config.port} (SSL: ${this.config.useSSL})`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Access Key: ${this.config.accessKey.substring(0, 8)}... (length: ${this.config.accessKey.length})`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Secret Key Length: ${this.config.secretKey.length} chars`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Metadata Keys (${Object.keys(metadata).length}):`,
+          JSON.stringify(Object.keys(metadata), null, 2)
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Full Metadata:`,
+          JSON.stringify(metadata, null, 2)
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Path Encoding Check:`,
+          JSON.stringify({
+            original: uploadPath,
+            normalized: normalizedUploadPath,
+            changed: uploadPath !== normalizedUploadPath,
+            utf8Bytes: pathBytes,
+            encoded: encodeURIComponent(normalizedUploadPath),
+            encodedBytes: Buffer.from(encodeURIComponent(normalizedUploadPath), 'utf8').length,
+          }, null, 2)
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] ================================================`
         );
       }
       
-      if (file.size && file.size > 0) {
-        // Pass size if valid
-        await this.client.putObject(
-          this.config.bucket,
-          uploadPath,
-          content,
-          file.size,
-          metadata
+      // Test credentials before upload by trying to list bucket (quick test)
+      // This helps identify credential issues early
+      try {
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Testing credentials with bucketExists check...`
+          );
+        }
+        const bucketExists = await this.client.bucketExists(this.config.bucket);
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Credentials test passed. Bucket exists: ${bucketExists}`
+          );
+        }
+      } catch (credTestError) {
+        const credErrorMsg = credTestError instanceof Error ? credTestError.message : String(credTestError);
+        console.error(`[MINIO-CREDENTIALS-TEST] Failed before upload:`, credErrorMsg);
+        console.error(`[MINIO-CREDENTIALS-TEST] This indicates credentials/endpoint mismatch!`);
+        // Continue anyway - let putObject fail with more context
+      }
+      
+      try {
+        if (file.size && file.size > 0) {
+          if (isDebugEnabled) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] Calling putObject WITH size parameter: ${file.size}`
+            );
+          }
+          await this.client.putObject(
+            this.config.bucket,
+            normalizedUploadPath,
+            content,
+            file.size,
+            metadata
+          );
+          if (isDebugEnabled) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] Upload succeeded`
+            );
+          }
+        } else {
+          if (isDebugEnabled) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] Calling putObject WITHOUT size parameter`
+            );
+          }
+          // Don't pass size - MinIO will calculate automatically (like old code)
+          // Cast to any to handle optional size parameter in TypeScript
+          await (this.client.putObject as any)(
+            this.config.bucket,
+            normalizedUploadPath,
+            content,
+            metadata
+          );
+          if (isDebugEnabled) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] Upload succeeded`
+            );
+          }
+        }
+      } catch (putObjectError) {
+        const putErrorMsg = putObjectError instanceof Error ? putObjectError.message : String(putObjectError);
+        const putErrorStack = putObjectError instanceof Error ? putObjectError.stack : undefined;
+        
+        // Always log error details (even without debug) - use console.log to ensure visibility
+        const errorDetails = {
+          bucket: this.config.bucket,
+          objectName: normalizedUploadPath,
+          objectNameLength: normalizedUploadPath.length,
+          objectNameBytes: pathBytes,
+          fullPathBytes: pathBytesFull,
+          originalHash: file.hash,
+          size: file.size || 'undefined',
+          metadataCount: Object.keys(metadata).length,
+          metadataKeys: Object.keys(metadata),
+          endpoint: `${this.config.endPoint}:${this.config.port}`,
+          accessKeyLength: this.config.accessKey.length,
+          accessKeyPrefix: this.config.accessKey.substring(0, 8),
+          secretKeyLength: this.config.secretKey.length,
+          useSSL: this.config.useSSL,
+        };
+        console.error(`[MINIO-UPLOAD-ERROR] putObject failed:`, putErrorMsg);
+        console.error(`[MINIO-UPLOAD-ERROR] Request details:`, JSON.stringify(errorDetails, null, 2));
+        this.logger.error(
+          `[strapi-provider-upload-minio] PUTOBJECT ERROR: ${putErrorMsg}`
         );
-      } else {
-        // Don't pass size - MinIO will calculate automatically (like old code)
-        // Cast to any to handle optional size parameter in TypeScript
-        await (this.client.putObject as any)(
-          this.config.bucket,
-          uploadPath,
-          content,
-          metadata
+        this.logger.error(
+          `[strapi-provider-upload-minio] Failed upload details:`,
+          JSON.stringify(errorDetails, null, 2)
         );
+        
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] ========== PUTOBJECT ERROR DETAILS ==========`
+          );
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Error Message: ${putErrorMsg}`
+          );
+          if (putErrorStack) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] Error Stack: ${putErrorStack}`
+            );
+          }
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Parameters used:`,
+            JSON.stringify({
+              bucket: this.config.bucket,
+              objectName: normalizedUploadPath,
+              objectNameLength: normalizedUploadPath.length,
+              objectNameBytes: pathBytes,
+              size: file.size || 'undefined',
+              hasMetadata: !!metadata,
+              metadataCount: Object.keys(metadata).length,
+              metadata: metadata,
+            }, null, 2)
+          );
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] ================================================`
+          );
+        }
+        throw putObjectError;
       }
       
       const uploadDuration = Date.now() - uploadStartTime;
-      const fileUrl = createFileUrl(uploadPath, this.hostUrl, this.config.bucket);
+      const fileUrl = createFileUrl(normalizedUploadPath, this.hostUrl, this.config.bucket);
       file.url = fileUrl;
       const totalDuration = Date.now() - startTime;
       
@@ -288,23 +488,129 @@ export class MinioProvider implements StrapiProvider {
       const duration = Date.now() - startTime;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      // Get upload path for error details (might not be available if path building failed)
+      let uploadPath: string | undefined;
+      let normalizedUploadPath: string | undefined;
+      let pathBytes: number | undefined;
+      try {
+        uploadPath = buildUploadPath(file, this.config.folder);
+        normalizedUploadPath = uploadPath.replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
+        pathBytes = Buffer.from(normalizedUploadPath, 'utf8').length;
+      } catch {
+        // Path building failed, will be handled separately
+      }
       
       if (isDebugEnabled) {
         this.logger.debug(
-          `[strapi-provider-upload-minio] [DEBUG] Upload failed in ${duration}ms: file="${file.name}", error="${errorMessage}"`
+          `[strapi-provider-upload-minio] [DEBUG] ========== UPLOAD ERROR DETAILS ==========`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Upload failed in ${duration}ms`
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Error Message: "${errorMessage}"`
+        );
+        if (errorStack) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Error Stack: ${errorStack}`
+          );
+        }
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] File Info:`,
+          JSON.stringify({
+            fileName: file.name,
+            fileNameLength: file.name?.length,
+            fileHash: file.hash,
+            fileHashLength: file.hash?.length,
+            fileExtension: file.ext,
+            fileSize: file.size,
+            fileMime: file.mime,
+          }, null, 2)
+        );
+        if (uploadPath) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Path Info:`,
+            JSON.stringify({
+              originalPath: uploadPath,
+              normalizedPath: normalizedUploadPath,
+              pathLength: normalizedUploadPath?.length,
+              pathBytes: pathBytes,
+              folder: this.config.folder,
+            }, null, 2)
+          );
+        }
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Config Info:`,
+          JSON.stringify({
+            endpoint: this.config.endPoint,
+            port: this.config.port,
+            useSSL: this.config.useSSL,
+            bucket: this.config.bucket,
+            accessKeyLength: this.config.accessKey?.length,
+            secretKeyLength: this.config.secretKey?.length,
+            accessKeyPrefix: this.config.accessKey?.substring(0, 8),
+          }, null, 2)
+        );
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] ===========================================`
         );
       }
-      
+
       const errorDetails: Record<string, unknown> = {
         fileName: file.name,
+        fileHash: file.hash,
+        fileExtension: file.ext,
+        uploadPath: uploadPath || "(path building failed)",
         fileSize: file.size,
         bucket: this.config.bucket,
         endpoint: this.config.endPoint,
         port: this.config.port,
       };
 
-      // Add more context for connection/timeout errors
+      // Add more context for signature/authentication errors
       if (
+        errorMessage.includes("signature") ||
+        errorMessage.includes("Signature") ||
+        errorMessage.includes("does not match") ||
+        errorMessage.includes("InvalidAccessKeyId") ||
+        errorMessage.includes("SignatureDoesNotMatch")
+      ) {
+        const accessKeyPrefix = this.config.accessKey.substring(0, Math.min(4, this.config.accessKey.length));
+        const isLocalhost = this.config.endPoint === "localhost" || this.config.endPoint === "127.0.0.1";
+        const isPlayMinIOCredentials = 
+          this.config.accessKey === "Q3AM3UQ867SPQQA43P2F" || 
+          this.config.accessKey.startsWith("Q3AM");
+        
+        let suggestion = `Signature mismatch error. This usually indicates incorrect credentials or endpoint mismatch. `;
+        
+        // Specific warning for Play.MinIO.io credentials with localhost
+        if (isPlayMinIOCredentials && isLocalhost) {
+          suggestion += `\n⚠️ WARNING: You're using Play.MinIO.io credentials (${accessKeyPrefix}***) with localhost endpoint. ` +
+            `These credentials only work with play.min.io endpoint. ` +
+            `For local MinIO, use credentials configured in your local MinIO instance (usually minioadmin/minioadmin). ` +
+            `If you want to use Play.MinIO.io, change MINIO_ENDPOINT to play.min.io and MINIO_USE_SSL to true.`;
+        } else {
+          suggestion += `\nPlease verify: 1) MINIO_ACCESS_KEY matches your MinIO access key, ` +
+            `2) MINIO_SECRET_KEY matches your MinIO secret key, ` +
+            `3) Credentials are correctly set in your .env file, ` +
+            `4) No extra whitespace or special characters in credentials, ` +
+            `5) Endpoint matches the MinIO server you're connecting to. ` +
+            `For MinIO running locally, default credentials are often minioadmin/minioadmin. ` +
+            `Check your MinIO console at http${this.config.useSSL ? "s" : ""}://${this.config.endPoint}:${this.config.port === 9000 ? "9001" : this.config.port + 1} to verify credentials.`;
+        }
+        
+        errorDetails.suggestion = suggestion;
+        errorDetails.errorType = "SignatureError";
+        errorDetails.accessKeyPrefix = accessKeyPrefix + "***";
+        errorDetails.endpoint = this.config.endPoint;
+        errorDetails.isLocalhost = isLocalhost;
+        if (uploadPath) {
+          errorDetails.uploadPath = uploadPath;
+        }
+      } else if (
+        // Add more context for connection/timeout errors
         errorMessage.includes("ETIMEDOUT") ||
         errorMessage.includes("ECONNRESET") ||
         errorMessage.includes("timeout") ||
@@ -633,41 +939,19 @@ export class MinioProvider implements StrapiProvider {
 
   /**
    * Creates metadata for file upload
-   * Includes Strapi file metadata like alternativeText, caption, etc.
+   * Returns only Content-Type to maintain security signature
    */
   private createMetadata(file: StrapiFile): Record<string, string> {
     const contentType = getMimeType(file.ext) || DEFAULT_MIME_TYPE;
     const metadata: Record<string, string> = {
       "Content-Type": contentType,
+      "X-Strapi-Name": file.name,
     };
-
-    // Add Strapi-specific metadata if available
-    if (file.alternativeText) {
-      metadata["X-Strapi-Alternative-Text"] = file.alternativeText;
-    }
-
-    if (file.caption) {
-      metadata["X-Strapi-Caption"] = file.caption;
-    }
-
-    if (file.name) {
-      metadata["X-Strapi-Name"] = file.name;
-    }
-
-    // Add custom metadata from file.metadata if provided
-    if (file.metadata) {
-      Object.entries(file.metadata).forEach(([key, value]) => {
-        if (typeof value === "string") {
-          // Prefix custom metadata keys to avoid conflicts
-          metadata[`X-Strapi-Metadata-${key}`] = value;
-        }
-      });
-    }
 
     const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
     if (isDebugEnabled) {
       this.logger.debug(
-        `[strapi-provider-upload-minio] [DEBUG] Created metadata: contentType="${contentType}", metadataKeys=${Object.keys(metadata).length}, hasAlternativeText=${!!file.alternativeText}, hasCaption=${!!file.caption}, hasCustomMetadata=${!!file.metadata}`
+        `[strapi-provider-upload-minio] [DEBUG] Created metadata: contentType="${contentType}", X-Strapi-Name="${file.name}"`
       );
     }
 

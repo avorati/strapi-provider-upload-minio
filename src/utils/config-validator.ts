@@ -147,11 +147,19 @@ export interface NormalizedConfig {
 export function validateAndNormalizeConfig(
   options: ProviderOptions
 ): NormalizedConfig {
+  // Get endpoint from endPoint or host (host is alias for endPoint)
+  const endPointValue = options.endPoint || options.host;
+  
   // Validate required fields
-  if (!options.endPoint || typeof options.endPoint !== "string") {
-    throw new ConfigurationError("endPoint is required and must be a string", {
-      provided: options.endPoint,
-    });
+  if (!endPointValue || typeof endPointValue !== "string") {
+    throw new ConfigurationError(
+      "endPoint or host is required and must be a string. " +
+      "You can use either 'endPoint' or 'host' (both work the same way).",
+      {
+        providedEndPoint: options.endPoint,
+        providedHost: options.host,
+      }
+    );
   }
 
   if (!options.accessKey || typeof options.accessKey !== "string") {
@@ -241,7 +249,7 @@ export function validateAndNormalizeConfig(
   }
 
   // Trim and validate non-empty values
-  const trimmedEndPoint = options.endPoint.trim();
+  const trimmedEndPoint = endPointValue.trim();
   const trimmedAccessKey = options.accessKey.trim();
   const trimmedSecretKey = options.secretKey.trim();
   const trimmedBucket = options.bucket.trim();
@@ -250,8 +258,11 @@ export function validateAndNormalizeConfig(
   // Validate that required fields are not empty after trim
   if (!trimmedEndPoint) {
     throw new ConfigurationError(
-      "endPoint cannot be empty after trimming whitespace",
-      { provided: options.endPoint }
+      "endPoint or host cannot be empty after trimming whitespace",
+      { 
+        providedEndPoint: options.endPoint,
+        providedHost: options.host,
+      }
     );
   }
 

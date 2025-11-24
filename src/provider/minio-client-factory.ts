@@ -30,6 +30,26 @@ export function createMinioClient(config: NormalizedConfig): MinioClient {
     clientOptions.transportAgent = new http.Agent(agentOptions);
   }
 
+  // Log client creation in debug mode
+  if (config.debug) {
+    const logger = require('../utils/logger').getLogger();
+    if (logger.isDebugEnabled && logger.isDebugEnabled()) {
+      logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Creating MinIO client:`,
+        JSON.stringify({
+          endPoint: config.endPoint,
+          port: config.port,
+          useSSL: config.useSSL,
+          accessKeyLength: config.accessKey?.length,
+          secretKeyLength: config.secretKey?.length,
+          accessKeyPrefix: config.accessKey?.substring(0, 8),
+          connectTimeout,
+          hasTransportAgent: !!clientOptions.transportAgent,
+        }, null, 2)
+      );
+    }
+  }
+
   return new MinioClient(clientOptions);
 }
 
