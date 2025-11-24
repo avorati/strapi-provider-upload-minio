@@ -18,8 +18,10 @@ dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 dotenv.config({ path: resolve(process.cwd(), ".env") });
 
 import { Client as MinioClient } from "minio";
-import defaultExport from "../src/index";
 import { StrapiFile } from "../src/index.types";
+
+// Import as CommonJS module (as Strapi does)
+const defaultExport = require("../src/index");
 
 const config = {
   endPoint: process.env.MINIO_ENDPOINT || process.env.MINIO_HOST || "localhost",
