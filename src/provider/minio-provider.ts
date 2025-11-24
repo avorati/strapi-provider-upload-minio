@@ -146,20 +146,33 @@ export class MinioProvider implements StrapiProvider {
    */
   public async upload(file: StrapiFile): Promise<void> {
     try {
-      // Check bucket existence before upload (non-blocking warning only)
-      await this.checkBucketExistsSilently();
-
       const uploadPath = buildUploadPath(file, this.config.folder);
       const metadata = this.createMetadata(file);
       const content = this.getFileContent(file);
 
-      await this.client.putObject(
-        this.config.bucket,
-        uploadPath,
-        content,
-        file.size,
-        metadata
-      );
+      // Call putObject - size is optional (MinIO can calculate automatically)
+      // This matches the behavior of the old code that didn't pass size
+      // MinIO v7.1.1 signature: putObject(bucketName, objectName, stream, size?, metaData?)
+      // We need to handle the optional size parameter correctly for TypeScript
+      if (file.size && file.size > 0) {
+        // Pass size if valid
+        await this.client.putObject(
+          this.config.bucket,
+          uploadPath,
+          content,
+          file.size,
+          metadata
+        );
+      } else {
+        // Don't pass size - MinIO will calculate automatically (like old code)
+        // Cast to any to handle optional size parameter in TypeScript
+        await (this.client.putObject as any)(
+          this.config.bucket,
+          uploadPath,
+          content,
+          metadata
+        );
+      }
 
       file.url = createFileUrl(uploadPath, this.hostUrl, this.config.bucket);
     } catch (error) {
@@ -169,29 +182,36 @@ export class MinioProvider implements StrapiProvider {
         fileName: file.name,
         fileSize: file.size,
         bucket: this.config.bucket,
+        endpoint: this.config.endPoint,
+        port: this.config.port,
       };
 
-      // Add more context if it's a bucket-related error
+      // Add more context for connection/timeout errors
       if (
+        errorMessage.includes("ETIMEDOUT") ||
+        errorMessage.includes("ECONNRESET") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("connect")
+      ) {
+        errorDetails.suggestion =
+          `Connection error to MinIO at ${this.config.endPoint}:${this.config.port}. ` +
+          `Please check: 1) MinIO server is running and accessible, 2) Network connectivity, ` +
+          `3) Firewall rules, 4) Connection timeout settings.`;
+        errorDetails.errorType = "ConnectionError";
+      } else if (
         errorMessage.includes("bucket") ||
         errorMessage.includes("Bucket") ||
         errorMessage.includes("NoSuchBucket")
       ) {
         errorDetails.suggestion =
           `Make sure the bucket "${this.config.bucket}" exists and is accessible.`;
+        errorDetails.errorType = "BucketError";
       }
 
       throw new UploadError(errorMessage, errorDetails);
     }
   }
 
-  /**
-   * Checks bucket existence silently (only logs warnings if bucket doesn't exist, never throws)
-   * Errors are silently ignored since we already warned during initialization
-   */
-  private async checkBucketExistsSilently(): Promise<void> {
-    await this.checkBucketExists(true);
-  }
 
   /**
    * Deletes a file from MinIO
@@ -405,6 +425,8 @@ export class MinioProvider implements StrapiProvider {
 
   /**
    * Gets file content as stream or buffer
+   * Matches the behavior of the old code: file.stream || Buffer.from(file.buffer, 'binary')
+   * In Strapi, file.buffer is typically already a Buffer, but we ensure compatibility
    */
   private getFileContent(file: StrapiFile): Readable | Buffer {
     if (file.stream) {
@@ -412,7 +434,13 @@ export class MinioProvider implements StrapiProvider {
     }
 
     if (file.buffer) {
-      return file.buffer;
+      // If buffer is already a Buffer instance, return it directly
+      // Otherwise convert it (matching old code behavior)
+      if (Buffer.isBuffer(file.buffer)) {
+        return file.buffer;
+      }
+      // Fallback: convert if it's not a Buffer (shouldn't happen in Strapi, but for safety)
+      return Buffer.from(file.buffer as any, 'binary');
     }
 
     throw new UploadError("File must have either stream or buffer property", {
