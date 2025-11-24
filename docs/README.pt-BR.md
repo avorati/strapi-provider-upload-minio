@@ -120,6 +120,9 @@ await strapi.plugin('upload').provider.upload(file, {
 | `folder` | string | ❌ | Pasta dentro do bucket (opcional) |
 | `private` | boolean | ❌ | Habilitar uploads privados (padrão: false) |
 | `expiry` | number | ❌ | Expiração de URL assinada em segundos (padrão: 604800 = 7 dias) |
+| `connectTimeout` | number | ❌ | Timeout de conexão em milissegundos (padrão: 60000 = 60 segundos) |
+| `requestTimeout` | number | ❌ | Timeout de requisição em milissegundos (opcional, para uso futuro) |
+| `debug` | boolean | ❌ | Habilitar logs de debug verbosos (padrão: false) |
 
 ## 🐳 Docker Compose - MinIO para desenvolvimento
 

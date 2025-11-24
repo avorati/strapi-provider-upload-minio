@@ -17,6 +17,7 @@ describe("url-builder", () => {
     folder: "",
     private: false,
     expiry: 3600,
+    debug: false,
   };
 
   describe("buildHostUrl", () => {

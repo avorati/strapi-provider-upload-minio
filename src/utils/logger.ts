@@ -6,12 +6,19 @@ export interface Logger {
   error(message: string, ...args: unknown[]): void;
   info(message: string, ...args: unknown[]): void;
   debug(message: string, ...args: unknown[]): void;
+  isDebugEnabled(): boolean;
 }
 
 /**
  * Default logger implementation using console
  */
 class ConsoleLogger implements Logger {
+  private debugEnabled: boolean = false;
+
+  constructor(debugEnabled: boolean = false) {
+    this.debugEnabled = debugEnabled;
+  }
+
   warn(message: string, ...args: unknown[]): void {
     console.warn(message, ...args);
   }
@@ -25,7 +32,17 @@ class ConsoleLogger implements Logger {
   }
 
   debug(message: string, ...args: unknown[]): void {
-    console.debug(message, ...args);
+    if (this.debugEnabled) {
+      console.debug(message, ...args);
+    }
+  }
+
+  isDebugEnabled(): boolean {
+    return this.debugEnabled;
+  }
+
+  setDebugEnabled(enabled: boolean): void {
+    this.debugEnabled = enabled;
   }
 }
 
@@ -48,6 +65,10 @@ class NoOpLogger implements Logger {
 
   debug(_message: string, ..._args: unknown[]): void {
     // No-op
+  }
+
+  isDebugEnabled(): boolean {
+    return false;
   }
 }
 
@@ -82,9 +103,10 @@ export function createNoOpLogger(): Logger {
 
 /**
  * Creates a console logger (default)
+ * @param debugEnabled Whether debug logging is enabled
  * @returns A logger that uses console methods
  */
-export function createConsoleLogger(): Logger {
-  return new ConsoleLogger();
+export function createConsoleLogger(debugEnabled: boolean = false): Logger {
+  return new ConsoleLogger(debugEnabled);
 }
 

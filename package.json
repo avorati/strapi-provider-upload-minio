@@ -37,7 +37,7 @@
   "homepage": "https://github.com/avorati/strapi-provider-upload-minio#readme",
   "dependencies": {
     "mime-types": "^3.0.1",
-    "minio": "7.1.1"
+    "minio": "8.0.6"
   },
   "peerDependencies": {
     "@strapi/strapi": "^5.0.0"

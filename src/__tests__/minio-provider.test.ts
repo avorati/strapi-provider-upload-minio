@@ -20,6 +20,7 @@ describe("MinioProvider", () => {
     folder: "uploads",
     private: false,
     expiry: 3600,
+    debug: false,
   };
 
   const mockFile: StrapiFile = {

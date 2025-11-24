@@ -52,6 +52,28 @@ export class MinioProvider implements StrapiProvider {
     this.client = createMinioClient(config);
     this.hostUrl = buildHostUrl(config);
     this.logger = logger || getLogger();
+    
+    // Log initialization details if debug is enabled
+    if (this.logger.isDebugEnabled && this.logger.isDebugEnabled()) {
+      const safeConfig = {
+        endPoint: config.endPoint,
+        port: config.port,
+        useSSL: config.useSSL,
+        accessKey: config.accessKey.substring(0, 4) + "***",
+        secretKey: "***",
+        bucket: config.bucket,
+        folder: config.folder || "(empty)",
+        private: config.private,
+        expiry: config.expiry,
+        connectTimeout: config.connectTimeout,
+        hostUrl: this.hostUrl,
+      };
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Initializing MinIO client with config:`,
+        JSON.stringify(safeConfig, null, 2)
+      );
+    }
+    
     // Check bucket existence asynchronously without blocking initialization
     // Use process.nextTick to avoid blocking and ensure it runs after constructor
     // Only check if not in test environment to avoid test warnings
@@ -87,9 +109,26 @@ export class MinioProvider implements StrapiProvider {
     silent: boolean = false,
     useCache: boolean = true
   ): Promise<void> {
+    const startTime = Date.now();
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+    
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Checking bucket existence: bucket="${this.config.bucket}", useCache=${useCache}, silent=${silent}`
+      );
+    }
+    
     // Check cache first if enabled
     if (useCache && this.isBucketCheckCacheValid()) {
       const cached = this.bucketCheckCache!;
+      const cacheAge = Date.now() - cached.timestamp;
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Using cached bucket check result: exists=${cached.exists}, cacheAge=${cacheAge}ms`
+        );
+      }
+      
       // Always log bucket existence warnings, even when silent=true
       // silent only controls error logging, not bucket existence warnings
       if (!cached.exists) {
@@ -101,13 +140,26 @@ export class MinioProvider implements StrapiProvider {
     }
 
     try {
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Calling bucketExists API for bucket: "${this.config.bucket}"`
+        );
+      }
+      
       const exists = await this.client.bucketExists(this.config.bucket);
+      const duration = Date.now() - startTime;
       
       // Update cache
       this.bucketCheckCache = {
         exists,
         timestamp: Date.now(),
       };
+
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Bucket check completed in ${duration}ms: exists=${exists}, bucket="${this.config.bucket}"`
+        );
+      }
 
       // Always log bucket existence warnings, even when silent=true
       // silent only controls error logging, not bucket existence warnings
@@ -120,11 +172,19 @@ export class MinioProvider implements StrapiProvider {
         );
       }
     } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Bucket check failed in ${duration}ms: error="${errorMessage}", bucket="${this.config.bucket}"`
+        );
+      }
+      
       // Only log warning if not silent - we don't want to break Strapi
       // silent controls error logging (connection issues, etc.)
       if (!silent) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
         this.logger.warn(
           `[strapi-provider-upload-minio] Warning: Could not verify bucket "${this.config.bucket}" existence: ${errorMessage}. ` +
             `This may indicate a connection issue with MinIO. Uploads may fail.`
@@ -145,15 +205,55 @@ export class MinioProvider implements StrapiProvider {
    * Uploads a file to MinIO
    */
   public async upload(file: StrapiFile): Promise<void> {
+    const startTime = Date.now();
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+    
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Starting upload: file="${file.name}", size=${file.size}, mime="${file.mime}", ext="${file.ext}", bucket="${this.config.bucket}"`
+      );
+    }
+    
     try {
       const uploadPath = buildUploadPath(file, this.config.folder);
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Upload path generated: "${uploadPath}", folder="${this.config.folder || "(empty)"}"`
+        );
+      }
+      
       const metadata = this.createMetadata(file);
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Metadata created:`,
+          JSON.stringify(metadata, null, 2)
+        );
+      }
+      
       const content = this.getFileContent(file);
+      const contentType = file.stream ? "stream" : "buffer";
+      const contentSize = file.stream ? "unknown" : (file.buffer && Buffer.isBuffer(file.buffer) ? file.buffer.length : "unknown");
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] File content type: ${contentType}, contentSize=${contentSize}, fileSize=${file.size}`
+        );
+      }
 
       // Call putObject - size is optional (MinIO can calculate automatically)
       // This matches the behavior of the old code that didn't pass size
-      // MinIO v7.1.1 signature: putObject(bucketName, objectName, stream, size?, metaData?)
+      // MinIO v8.0.6 signature: putObject(bucketName, objectName, stream, size?, metaData?)
       // We need to handle the optional size parameter correctly for TypeScript
+      const uploadStartTime = Date.now();
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Calling putObject: bucket="${this.config.bucket}", objectName="${uploadPath}", size=${file.size || "auto"}, metadataKeys=${Object.keys(metadata).length}`
+        );
+      }
+      
       if (file.size && file.size > 0) {
         // Pass size if valid
         await this.client.putObject(
@@ -173,11 +273,28 @@ export class MinioProvider implements StrapiProvider {
           metadata
         );
       }
-
-      file.url = createFileUrl(uploadPath, this.hostUrl, this.config.bucket);
+      
+      const uploadDuration = Date.now() - uploadStartTime;
+      const fileUrl = createFileUrl(uploadPath, this.hostUrl, this.config.bucket);
+      file.url = fileUrl;
+      const totalDuration = Date.now() - startTime;
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Upload completed successfully in ${totalDuration}ms (putObject: ${uploadDuration}ms): file="${file.name}", url="${fileUrl}"`
+        );
+      }
     } catch (error) {
+      const duration = Date.now() - startTime;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Upload failed in ${duration}ms: file="${file.name}", error="${errorMessage}"`
+        );
+      }
+      
       const errorDetails: Record<string, unknown> = {
         fileName: file.name,
         fileSize: file.size,
@@ -217,6 +334,15 @@ export class MinioProvider implements StrapiProvider {
    * Deletes a file from MinIO
    */
   public async delete(file: StrapiFile): Promise<void> {
+    const startTime = Date.now();
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+    
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Starting delete: fileUrl="${file.url}", fileName="${file.name}", bucket="${this.config.bucket}"`
+      );
+    }
+    
     try {
       if (!file.url) {
         throw new Error("File URL is required for deletion");
@@ -228,10 +354,41 @@ export class MinioProvider implements StrapiProvider {
         this.config.bucket
       );
 
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Extracted file path: "${filePath}" from URL: "${file.url}"`
+        );
+      }
+
+      const deleteStartTime = Date.now();
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Calling removeObject: bucket="${this.config.bucket}", objectName="${filePath}"`
+        );
+      }
+      
       await this.client.removeObject(this.config.bucket, filePath);
+      
+      const deleteDuration = Date.now() - deleteStartTime;
+      const totalDuration = Date.now() - startTime;
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Delete completed successfully in ${totalDuration}ms (removeObject: ${deleteDuration}ms): filePath="${filePath}"`
+        );
+      }
     } catch (error) {
+      const duration = Date.now() - startTime;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Delete failed in ${duration}ms: fileUrl="${file.url}", error="${errorMessage}"`
+        );
+      }
+      
       const errorDetails: Record<string, unknown> = {
         fileUrl: file.url,
         bucket: this.config.bucket,
@@ -264,6 +421,15 @@ export class MinioProvider implements StrapiProvider {
     file: StrapiFile,
     options?: SignedUrlOptions
   ): Promise<SignedUrlResponse> {
+    const startTime = Date.now();
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+    
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Starting getSignedUrl: fileUrl="${file.url}", fileName="${file.name}", expiresIn=${options?.expiresIn || "default"}, bucket="${this.config.bucket}"`
+      );
+    }
+    
     if (!file.url) {
       throw new SignedUrlError("File URL is required for signed URL generation", {
         fileName: file.name,
@@ -275,6 +441,12 @@ export class MinioProvider implements StrapiProvider {
     const isAlreadySigned = file.url.includes("X-Amz-Algorithm") || 
                             file.url.includes("signature=");
 
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] URL already signed: ${isAlreadySigned}`
+      );
+    }
+
     // Primary check: verify if file is from the same bucket
     const isFromSameBucket = isFileFromSameBucket(
       file.url,
@@ -285,17 +457,34 @@ export class MinioProvider implements StrapiProvider {
     // Fallback check: verify if pathname contains the bucket (for legacy URLs)
     const pathnameHasBucket = pathnameContainsBucket(file.url, this.config.bucket);
 
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Bucket checks: isFromSameBucket=${isFromSameBucket}, pathnameHasBucket=${pathnameHasBucket}`
+      );
+    }
+
     // If file is not from the same bucket and pathname doesn't contain bucket, return original URL
     if (!isFromSameBucket && !pathnameHasBucket) {
-      this.logger.debug(
-        `[strapi-provider-upload-minio] File URL does not belong to bucket "${this.config.bucket}": ${file.url}`
-      );
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] File URL does not belong to bucket "${this.config.bucket}": ${file.url}, returning original URL`
+        );
+      } else {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] File URL does not belong to bucket "${this.config.bucket}": ${file.url}`
+        );
+      }
       return { url: file.url };
     }
 
     // If URL is already signed and no custom expiry is requested, return as-is
     // This avoids unnecessary regeneration of signed URLs
     if (isAlreadySigned && options?.expiresIn === undefined) {
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] URL already signed and no custom expiry requested, returning as-is`
+        );
+      }
       return { url: file.url };
     }
 
@@ -308,11 +497,23 @@ export class MinioProvider implements StrapiProvider {
           this.hostUrl,
           this.config.bucket
         );
+        
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Extracted file path using hostUrl: "${filePath}"`
+          );
+        }
       } catch (extractError) {
         // If extraction fails with hostUrl, try to extract from pathname directly
-        this.logger.debug(
-          `[strapi-provider-upload-minio] Failed to extract path with hostUrl, trying pathname extraction: ${extractError instanceof Error ? extractError.message : String(extractError)}`
-        );
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Failed to extract path with hostUrl, trying pathname extraction: ${extractError instanceof Error ? extractError.message : String(extractError)}`
+          );
+        } else {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] Failed to extract path with hostUrl, trying pathname extraction: ${extractError instanceof Error ? extractError.message : String(extractError)}`
+          );
+        }
         
         try {
           const urlObj = new URL(file.url);
@@ -326,6 +527,12 @@ export class MinioProvider implements StrapiProvider {
           } else {
             throw new Error("Could not extract file path from pathname");
           }
+          
+          if (isDebugEnabled) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] Extracted file path using pathname: "${filePath}"`
+            );
+          }
         } catch (pathnameError) {
           // If all extraction methods fail, log and return original URL
           this.logger.warn(
@@ -338,11 +545,25 @@ export class MinioProvider implements StrapiProvider {
       // Use custom expiry if provided, otherwise use config default
       const expiry = options?.expiresIn || this.config.expiry;
 
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Using expiry: ${expiry} seconds (${options?.expiresIn ? "custom" : "default"})`
+        );
+      }
+
       // Validate expiry
       if (expiry <= 0 || !Number.isInteger(expiry)) {
         throw new SignedUrlError(
           "expiresIn must be a positive integer (seconds)",
           { provided: expiry }
+        );
+      }
+
+      const presignStartTime = Date.now();
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Calling presignedGetObject: bucket="${this.config.bucket}", objectName="${filePath}", expiry=${expiry}`
         );
       }
 
@@ -352,10 +573,27 @@ export class MinioProvider implements StrapiProvider {
         expiry
       );
 
+      const presignDuration = Date.now() - presignStartTime;
+      const totalDuration = Date.now() - startTime;
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Signed URL generated successfully in ${totalDuration}ms (presignedGetObject: ${presignDuration}ms): url="${presignedUrl.substring(0, 100)}..."`
+        );
+      }
+
       return { url: presignedUrl };
     } catch (error) {
+      const duration = Date.now() - startTime;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Signed URL generation failed in ${duration}ms: fileUrl="${file.url}", error="${errorMessage}"`
+        );
+      }
+      
       const errorDetails: Record<string, unknown> = {
         fileUrl: file.url,
         bucket: this.config.bucket,
@@ -377,9 +615,15 @@ export class MinioProvider implements StrapiProvider {
       // For legacy files, return original URL instead of throwing error
       // This ensures backward compatibility
       if (pathnameHasBucket && !isFromSameBucket) {
-        this.logger.debug(
-          `[strapi-provider-upload-minio] Legacy file detected, returning original URL as fallback`
-        );
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Legacy file detected, returning original URL as fallback`
+          );
+        } else {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] Legacy file detected, returning original URL as fallback`
+          );
+        }
         return { url: file.url };
       }
 
@@ -420,6 +664,13 @@ export class MinioProvider implements StrapiProvider {
       });
     }
 
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Created metadata: contentType="${contentType}", metadataKeys=${Object.keys(metadata).length}, hasAlternativeText=${!!file.alternativeText}, hasCaption=${!!file.caption}, hasCustomMetadata=${!!file.metadata}`
+      );
+    }
+
     return metadata;
   }
 
@@ -429,18 +680,31 @@ export class MinioProvider implements StrapiProvider {
    * In Strapi, file.buffer is typically already a Buffer, but we ensure compatibility
    */
   private getFileContent(file: StrapiFile): Readable | Buffer {
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+    
     if (file.stream) {
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Using file stream for content, fileSize=${file.size}`
+        );
+      }
       return file.stream;
     }
 
     if (file.buffer) {
       // If buffer is already a Buffer instance, return it directly
       // Otherwise convert it (matching old code behavior)
-      if (Buffer.isBuffer(file.buffer)) {
-        return file.buffer;
+      const buffer = Buffer.isBuffer(file.buffer) 
+        ? file.buffer 
+        : Buffer.from(file.buffer as any, 'binary');
+      
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Using file buffer for content: bufferSize=${buffer.length}, fileSize=${file.size}, isBuffer=${Buffer.isBuffer(file.buffer)}`
+        );
       }
-      // Fallback: convert if it's not a Buffer (shouldn't happen in Strapi, but for safety)
-      return Buffer.from(file.buffer as any, 'binary');
+      
+      return buffer;
     }
 
     throw new UploadError("File must have either stream or buffer property", {

@@ -62,6 +62,7 @@ export interface ProviderOptions {
   expiry?: number | string;
   connectTimeout?: number | string; // Connection timeout in milliseconds
   requestTimeout?: number | string; // Request timeout in milliseconds (optional, for future use)
+  debug?: boolean | string; // Enable verbose debug logging
 }
 
 export interface SignedUrlResponse {
