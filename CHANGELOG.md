@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.0...v1.4.1) (2025-11-24)
+
+
+### Bug Fixes
+
+* allow string values for expiry and port config, add commitlint validation ([1da0069](https://github.com/avorati/strapi-provider-upload-minio/commit/1da00693bfc286b1795bb79d84f83a1d815b4d19))
+
 # [1.4.0](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.3.0...v1.4.0) (2025-11-24)
 
 
