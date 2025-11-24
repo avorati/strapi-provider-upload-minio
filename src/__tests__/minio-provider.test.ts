@@ -72,7 +72,6 @@ describe("MinioProvider", () => {
         1024,
         expect.objectContaining({
           "Content-Type": "image/jpeg",
-          "X-Strapi-Name": "test.jpg",
         })
       );
       expect(mockFile.url).toBe("http://localhost:9000/test-bucket/uploads/abc123.jpg");
@@ -89,7 +88,6 @@ describe("MinioProvider", () => {
         1024,
         expect.objectContaining({
           "Content-Type": "image/jpeg",
-          "X-Strapi-Name": "test.jpg",
         })
       );
     });

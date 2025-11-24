@@ -945,13 +945,12 @@ export class MinioProvider implements StrapiProvider {
     const contentType = getMimeType(file.ext) || DEFAULT_MIME_TYPE;
     const metadata: Record<string, string> = {
       "Content-Type": contentType,
-      "X-Strapi-Name": file.name,
     };
 
     const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
     if (isDebugEnabled) {
       this.logger.debug(
-        `[strapi-provider-upload-minio] [DEBUG] Created metadata: contentType="${contentType}", X-Strapi-Name="${file.name}"`
+        `[strapi-provider-upload-minio] [DEBUG] Created metadata: contentType="${contentType}"`
       );
     }
 
