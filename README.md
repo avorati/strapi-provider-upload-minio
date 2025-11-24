@@ -54,6 +54,7 @@ export default {
         host: process.env.MINIO_HOST || process.env.MINIO_ENDPOINT || 'localhost',
         port: parseInt(process.env.MINIO_PORT || '9000'),
         useSSL: process.env.MINIO_USE_SSL === 'true',
+        rejectUnauthorized: process.env.MINIO_REJECT_UNAUTHORIZED !== 'false', // default: true (secure)
         accessKey: process.env.MINIO_ACCESS_KEY,
         secretKey: process.env.MINIO_SECRET_KEY,
         bucket: process.env.MINIO_BUCKET || 'strapi-uploads',
@@ -125,8 +126,9 @@ await strapi.plugin('upload').provider.upload(file, {
 | Option           | Type   | Required | Description                                 |
 |------------------|--------|----------|---------------------------------------------|
 | `host` or `endPoint` | string | ✅       | MinIO server endpoint (you can use either one) |
-| `port`           | number | ❌       | Server port (default: 9000 for HTTP, 443 for HTTPS) |
+| `port`           | number | ❌       | Server port (default: 9000 for HTTP, 443 for HTTPS when useSSL=true) |
 | `useSSL`         | boolean| ❌       | Use HTTPS (default: false)                  |
+| `rejectUnauthorized` | boolean| ❌       | Reject unauthorized SSL certificates (default: true). Set to false for self-signed certificates in dev/hmg environments |
 | `accessKey`      | string | ✅       | MinIO access key                            |
 | `secretKey`      | string | ✅       | MinIO secret key                            |
 | `bucket`         | string | ✅       | Bucket name to store files                  |

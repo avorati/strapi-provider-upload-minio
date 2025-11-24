@@ -18,6 +18,7 @@ describe("url-builder", () => {
     private: false,
     expiry: 3600,
     debug: false,
+    rejectUnauthorized: true,
   };
 
   describe("buildHostUrl", () => {
