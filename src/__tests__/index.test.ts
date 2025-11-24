@@ -19,10 +19,19 @@ describe("index", () => {
   };
 
   describe("init", () => {
-    it("should initialize and return a MinioProvider instance", () => {
+    it("should initialize and return a provider object with required methods", () => {
       const provider = defaultExport.init(validConfig);
 
-      expect(provider).toBeInstanceOf(MinioProvider);
+      expect(provider).toHaveProperty("upload");
+      expect(provider).toHaveProperty("uploadStream");
+      expect(provider).toHaveProperty("delete");
+      expect(provider).toHaveProperty("isPrivate");
+      expect(provider).toHaveProperty("getSignedUrl");
+      expect(typeof provider.upload).toBe("function");
+      expect(typeof provider.uploadStream).toBe("function");
+      expect(typeof provider.delete).toBe("function");
+      expect(typeof provider.isPrivate).toBe("function");
+      expect(typeof provider.getSignedUrl).toBe("function");
     });
 
     it("should initialize provider with minimal required config", () => {
@@ -35,7 +44,11 @@ describe("index", () => {
 
       const provider = defaultExport.init(minimalConfig);
 
-      expect(provider).toBeInstanceOf(MinioProvider);
+      expect(provider).toHaveProperty("upload");
+      expect(provider).toHaveProperty("uploadStream");
+      expect(provider).toHaveProperty("delete");
+      expect(provider).toHaveProperty("isPrivate");
+      expect(provider).toHaveProperty("getSignedUrl");
     });
 
     it("should throw ConfigurationError for invalid config", () => {
@@ -63,7 +76,8 @@ describe("index", () => {
 
       const provider = defaultExport.init(configWithStringBooleans);
 
-      expect(provider).toBeInstanceOf(MinioProvider);
+      expect(provider).toHaveProperty("isPrivate");
+      expect(typeof provider.isPrivate).toBe("function");
       expect(provider.isPrivate()).toBe(true);
     });
 
@@ -79,7 +93,11 @@ describe("index", () => {
 
       const provider = defaultExport.init(customConfig);
 
-      expect(provider).toBeInstanceOf(MinioProvider);
+      expect(provider).toHaveProperty("upload");
+      expect(provider).toHaveProperty("uploadStream");
+      expect(provider).toHaveProperty("delete");
+      expect(provider).toHaveProperty("isPrivate");
+      expect(provider).toHaveProperty("getSignedUrl");
     });
   });
 });
