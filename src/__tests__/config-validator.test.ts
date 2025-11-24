@@ -23,6 +23,7 @@ describe("config-validator", () => {
       expect(config.folder).toBe("");
       expect(config.private).toBe(false);
       expect(config.expiry).toBe(7 * 24 * 60 * 60); // default 7 days
+      expect(config.connectTimeout).toBe(60000); // default 60 seconds
     });
 
     it("should normalize boolean strings", () => {
@@ -243,6 +244,76 @@ describe("config-validator", () => {
       );
 
       consoleSpy.mockRestore();
+    });
+
+    it("should use custom connectTimeout when provided", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        connectTimeout: 30000,
+      });
+
+      expect(config.connectTimeout).toBe(30000);
+    });
+
+    it("should convert string connectTimeout to number", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        connectTimeout: "45000",
+      });
+
+      expect(config.connectTimeout).toBe(45000);
+    });
+
+    it("should convert string connectTimeout with whitespace to number", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        connectTimeout: "  30000  ",
+      });
+
+      expect(config.connectTimeout).toBe(30000);
+    });
+
+    it("should use default connectTimeout when string is not a valid number", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        connectTimeout: "not-a-number",
+      });
+
+      expect(config.connectTimeout).toBe(60000); // default 60 seconds
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid connectTimeout value")
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should use default connectTimeout when connectTimeout is invalid", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+
+      const config1 = validateAndNormalizeConfig({
+        ...validConfig,
+        connectTimeout: -1,
+      });
+      expect(config1.connectTimeout).toBe(60000); // default
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid connectTimeout value")
+      );
+
+      const config2 = validateAndNormalizeConfig({
+        ...validConfig,
+        connectTimeout: 0,
+      });
+      expect(config2.connectTimeout).toBe(60000); // default
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid connectTimeout value")
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should use default connectTimeout when not provided", () => {
+      const config = validateAndNormalizeConfig(validConfig);
+      expect(config.connectTimeout).toBe(60000); // default 60 seconds
     });
 
     it("should throw ConfigurationError when endPoint is empty after trim", () => {

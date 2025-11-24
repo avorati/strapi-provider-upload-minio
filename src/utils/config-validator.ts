@@ -4,6 +4,7 @@ import { getLogger } from "./logger";
 
 const DEFAULT_PORT = 9000;
 const DEFAULT_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
+const DEFAULT_CONNECT_TIMEOUT = 60000; // 60 seconds in milliseconds
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
@@ -135,6 +136,8 @@ export interface NormalizedConfig {
   folder: string;
   private: boolean;
   expiry: number;
+  connectTimeout?: number; // Connection timeout in milliseconds
+  requestTimeout?: number; // Request timeout in milliseconds (optional, for future use)
 }
 
 /**
@@ -287,7 +290,37 @@ export function validateAndNormalizeConfig(
     );
   }
 
-  return {
+  // Parse and validate connectTimeout
+  let connectTimeout: number | undefined;
+  if (options.connectTimeout !== undefined) {
+    const parsedTimeout = parseNumber(options.connectTimeout);
+    if (parsedTimeout !== undefined && parsedTimeout > 0) {
+      connectTimeout = parsedTimeout;
+    } else {
+      logger.warn(
+        `[strapi-provider-upload-minio] Warning: Invalid connectTimeout value "${options.connectTimeout}". Using default connectTimeout ${DEFAULT_CONNECT_TIMEOUT}ms (${DEFAULT_CONNECT_TIMEOUT / 1000} seconds).`
+      );
+    }
+  }
+  // Use default if not provided or invalid
+  if (connectTimeout === undefined) {
+    connectTimeout = DEFAULT_CONNECT_TIMEOUT;
+  }
+
+  // Parse and validate requestTimeout (optional, for future use)
+  let requestTimeout: number | undefined;
+  if (options.requestTimeout !== undefined) {
+    const parsedTimeout = parseNumber(options.requestTimeout);
+    if (parsedTimeout !== undefined && parsedTimeout > 0) {
+      requestTimeout = parsedTimeout;
+    } else {
+      logger.warn(
+        `[strapi-provider-upload-minio] Warning: Invalid requestTimeout value "${options.requestTimeout}". Ignoring requestTimeout.`
+      );
+    }
+  }
+
+  const normalizedConfig: NormalizedConfig = {
     endPoint: trimmedEndPoint,
     port,
     useSSL,
@@ -297,7 +330,14 @@ export function validateAndNormalizeConfig(
     folder: trimmedFolder,
     private: isPrivate,
     expiry,
+    connectTimeout,
   };
+
+  if (requestTimeout !== undefined) {
+    normalizedConfig.requestTimeout = requestTimeout;
+  }
+
+  return normalizedConfig;
 }
 
 /**
