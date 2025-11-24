@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.3...v1.4.4) (2025-11-24)
+
+
+### Bug Fixes
+
+* remove query parameters from URL when extracting file path ([2e46da4](https://github.com/avorati/strapi-provider-upload-minio/commit/2e46da4df08ecb30db297209e602a799a0078e0b))
+* update integration test to use CommonJS require ([6ee0d53](https://github.com/avorati/strapi-provider-upload-minio/commit/6ee0d53cb356037517bf7db687096649245211c9))
+
 ## [1.4.3](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.2...v1.4.3) (2025-11-24)
 
 
