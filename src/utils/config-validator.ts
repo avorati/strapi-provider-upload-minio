@@ -2,7 +2,8 @@ import { ConfigurationError } from "../errors/provider-errors";
 import { ProviderOptions } from "../index.types";
 import { getLogger } from "./logger";
 
-const DEFAULT_PORT = 9000;
+const DEFAULT_PORT_HTTP = 9000; // Default port for HTTP
+const DEFAULT_PORT_HTTPS = 443; // Default port for HTTPS
 const DEFAULT_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
 const DEFAULT_CONNECT_TIMEOUT = 60000; // 60 seconds in milliseconds
 const MIN_PORT = 1;
@@ -139,6 +140,7 @@ export interface NormalizedConfig {
   connectTimeout?: number; // Connection timeout in milliseconds
   requestTimeout?: number; // Request timeout in milliseconds (optional, for future use)
   debug: boolean; // Enable verbose debug logging
+  rejectUnauthorized: boolean; // Reject unauthorized SSL certificates (default: true). Set to false for self-signed certificates
 }
 
 /**
@@ -184,17 +186,22 @@ export function validateAndNormalizeConfig(
 
   const logger = getLogger();
 
+  // Normalize boolean values first to determine default port
+  const useSSL = parseBoolean(options.useSSL);
+
   // Parse and validate port
   let port: number;
   if (options.port === undefined) {
-    port = DEFAULT_PORT;
+    // Use default port based on SSL configuration
+    port = useSSL ? DEFAULT_PORT_HTTPS : DEFAULT_PORT_HTTP;
   } else {
     const parsedPort = parseNumber(options.port);
     if (parsedPort === undefined) {
+      const defaultPort = useSSL ? DEFAULT_PORT_HTTPS : DEFAULT_PORT_HTTP;
       logger.warn(
-        `[strapi-provider-upload-minio] Warning: Invalid port value "${options.port}". Using default port ${DEFAULT_PORT}.`
+        `[strapi-provider-upload-minio] Warning: Invalid port value "${options.port}". Using default port ${defaultPort} for ${useSSL ? "HTTPS" : "HTTP"}.`
       );
-      port = DEFAULT_PORT;
+      port = defaultPort;
     } else {
       port = parsedPort;
     }
@@ -205,10 +212,27 @@ export function validateAndNormalizeConfig(
     port > MAX_PORT ||
     !Number.isInteger(port)
   ) {
+    const defaultPort = useSSL ? DEFAULT_PORT_HTTPS : DEFAULT_PORT_HTTP;
     logger.warn(
-      `[strapi-provider-upload-minio] Warning: Port ${port} is out of valid range (${MIN_PORT}-${MAX_PORT}). Using default port ${DEFAULT_PORT}.`
+      `[strapi-provider-upload-minio] Warning: Port ${port} is out of valid range (${MIN_PORT}-${MAX_PORT}). Using default port ${defaultPort} for ${useSSL ? "HTTPS" : "HTTP"}.`
     );
-    port = DEFAULT_PORT;
+    port = defaultPort;
+  }
+
+  // Warn about potentially incorrect port configuration
+  // Common mistake: useSSL=true with port 9000 (HTTP default)
+  if (useSSL && port === DEFAULT_PORT_HTTP) {
+    logger.warn(
+      `[strapi-provider-upload-minio] Warning: SSL is enabled (useSSL=true) but port is ${DEFAULT_PORT_HTTP} (HTTP default). ` +
+      `This may cause connection issues. For HTTPS, consider using port ${DEFAULT_PORT_HTTPS} (default HTTPS port) or the correct HTTPS port for your MinIO server.`
+    );
+  }
+  // Also warn about HTTP with port 443 (HTTPS default)
+  if (!useSSL && port === DEFAULT_PORT_HTTPS) {
+    logger.warn(
+      `[strapi-provider-upload-minio] Warning: SSL is disabled (useSSL=false) but port is ${DEFAULT_PORT_HTTPS} (HTTPS default). ` +
+      `This may cause connection issues. For HTTP, consider using port ${DEFAULT_PORT_HTTP} (default HTTP port) or the correct HTTP port for your MinIO server.`
+    );
   }
 
   // Parse and validate expiry
@@ -233,10 +257,14 @@ export function validateAndNormalizeConfig(
     expiry = DEFAULT_EXPIRY;
   }
 
-  // Normalize boolean values
-  const useSSL = parseBoolean(options.useSSL);
+  // useSSL was already normalized above for port validation
   const isPrivate = parseBoolean(options.private);
   const debug = parseBoolean(options.debug);
+  // rejectUnauthorized defaults to true (secure by default)
+  // Only set to false if explicitly provided as false (for self-signed certs in dev/hmg)
+  const rejectUnauthorized = options.rejectUnauthorized === undefined 
+    ? true 
+    : parseBoolean(options.rejectUnauthorized);
 
   // Validate private configuration
   if (isPrivate) {
@@ -345,6 +373,7 @@ export function validateAndNormalizeConfig(
     expiry,
     connectTimeout,
     debug,
+    rejectUnauthorized,
   };
 
   if (requestTimeout !== undefined) {

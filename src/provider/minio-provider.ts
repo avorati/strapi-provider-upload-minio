@@ -367,8 +367,19 @@ export class MinioProvider implements StrapiProvider {
         }
       } catch (credTestError) {
         const credErrorMsg = credTestError instanceof Error ? credTestError.message : String(credTestError);
+        const credErrorStack = credTestError instanceof Error ? credTestError.stack : undefined;
+        const credErrorCode = (credTestError as any)?.code;
+        const credErrorSyscall = (credTestError as any)?.syscall;
+        const credErrorHostname = (credTestError as any)?.hostname;
+        
         console.error(`[MINIO-CREDENTIALS-TEST] Failed before upload:`, credErrorMsg);
-        console.error(`[MINIO-CREDENTIALS-TEST] This indicates credentials/endpoint mismatch!`);
+        console.error(`[MINIO-CREDENTIALS-TEST] Error code:`, credErrorCode);
+        console.error(`[MINIO-CREDENTIALS-TEST] Error syscall:`, credErrorSyscall);
+        console.error(`[MINIO-CREDENTIALS-TEST] Error hostname:`, credErrorHostname);
+        if (credErrorStack) {
+          console.error(`[MINIO-CREDENTIALS-TEST] Error stack:`, credErrorStack);
+        }
+        console.error(`[MINIO-CREDENTIALS-TEST] This may indicate credentials/endpoint mismatch, SSL certificate issues, or network connectivity problems!`);
         // Continue anyway - let putObject fail with more context
       }
       
@@ -411,9 +422,18 @@ export class MinioProvider implements StrapiProvider {
             );
           }
         }
+
+        // Ensure stream is completely closed after upload to prevent EBUSY errors on Windows
+        // This is especially important when multiple uploads happen in parallel
+        // (original, thumbnail, large, medium, small) sharing the same temporary file
+        await this.ensureStreamClosed(content);
       } catch (putObjectError) {
         const putErrorMsg = putObjectError instanceof Error ? putObjectError.message : String(putObjectError);
         const putErrorStack = putObjectError instanceof Error ? putObjectError.stack : undefined;
+        const putErrorCode = (putObjectError as any)?.code;
+        const putErrorSyscall = (putObjectError as any)?.syscall;
+        const putErrorHostname = (putObjectError as any)?.hostname;
+        const putErrorErrno = (putObjectError as any)?.errno;
         
         // Always log error details (even without debug) - use console.log to ensure visibility
         const errorDetails = {
@@ -431,8 +451,19 @@ export class MinioProvider implements StrapiProvider {
           accessKeyPrefix: this.config.accessKey.substring(0, 8),
           secretKeyLength: this.config.secretKey.length,
           useSSL: this.config.useSSL,
+          rejectUnauthorized: this.config.rejectUnauthorized,
+          errorCode: putErrorCode,
+          errorSyscall: putErrorSyscall,
+          errorHostname: putErrorHostname,
+          errorErrno: putErrorErrno,
         };
         console.error(`[MINIO-UPLOAD-ERROR] putObject failed:`, putErrorMsg);
+        console.error(`[MINIO-UPLOAD-ERROR] Error code:`, putErrorCode);
+        console.error(`[MINIO-UPLOAD-ERROR] Error syscall:`, putErrorSyscall);
+        console.error(`[MINIO-UPLOAD-ERROR] Error hostname:`, putErrorHostname);
+        if (putErrorStack) {
+          console.error(`[MINIO-UPLOAD-ERROR] Error stack:`, putErrorStack);
+        }
         console.error(`[MINIO-UPLOAD-ERROR] Request details:`, JSON.stringify(errorDetails, null, 2));
         this.logger.error(
           `[strapi-provider-upload-minio] PUTOBJECT ERROR: ${putErrorMsg}`
@@ -614,13 +645,39 @@ export class MinioProvider implements StrapiProvider {
         errorMessage.includes("ETIMEDOUT") ||
         errorMessage.includes("ECONNRESET") ||
         errorMessage.includes("timeout") ||
-        errorMessage.includes("connect")
+        errorMessage.includes("connect") ||
+        errorMessage.includes("ENOTFOUND") ||
+        errorMessage.includes("ECONNREFUSED") ||
+        (error as any)?.code === "ETIMEDOUT" ||
+        (error as any)?.code === "ECONNRESET" ||
+        (error as any)?.code === "ENOTFOUND" ||
+        (error as any)?.code === "ECONNREFUSED"
       ) {
+        const errorCode = (error as any)?.code;
         errorDetails.suggestion =
-          `Connection error to MinIO at ${this.config.endPoint}:${this.config.port}. ` +
-          `Please check: 1) MinIO server is running and accessible, 2) Network connectivity, ` +
-          `3) Firewall rules, 4) Connection timeout settings.`;
+          `Connection error to MinIO at ${this.config.endPoint}:${this.config.port} (error code: ${errorCode || "unknown"}). ` +
+          `Please check: 1) MinIO server is running and accessible, 2) Network connectivity from Strapi to MinIO, ` +
+          `3) Firewall rules allowing connection, 4) Connection timeout settings (current: ${this.config.connectTimeout}ms), ` +
+          `5) DNS resolution for ${this.config.endPoint}, 6) SSL/TLS configuration if useSSL=true.`;
         errorDetails.errorType = "ConnectionError";
+        errorDetails.errorCode = errorCode;
+      } else if (
+        // SSL certificate errors
+        errorMessage.includes("certificate") ||
+        errorMessage.includes("CERT") ||
+        errorMessage.includes("UNABLE_TO_VERIFY_LEAF_SIGNATURE") ||
+        errorMessage.includes("SELF_SIGNED_CERT") ||
+        (error as any)?.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
+        (error as any)?.code === "SELF_SIGNED_CERT_IN_CHAIN" ||
+        (error as any)?.code === "DEPTH_ZERO_SELF_SIGNED_CERT"
+      ) {
+        const errorCode = (error as any)?.code;
+        errorDetails.suggestion =
+          `SSL certificate error (error code: ${errorCode || "unknown"}). ` +
+          `If using self-signed certificates in dev/hmg environments, set MINIO_REJECT_UNAUTHORIZED=false. ` +
+          `⚠️ WARNING: This reduces security - only use in non-production environments!`;
+        errorDetails.errorType = "SSLCertificateError";
+        errorDetails.errorCode = errorCode;
       } else if (
         errorMessage.includes("bucket") ||
         errorMessage.includes("Bucket") ||
@@ -992,6 +1049,163 @@ export class MinioProvider implements StrapiProvider {
 
     throw new UploadError("File must have either stream or buffer property", {
       fileName: file.name,
+    });
+  }
+
+  /**
+   * Ensures a stream is completely consumed and closed
+   * This prevents EBUSY errors on Windows when Strapi tries to clean up temporary files
+   * after parallel uploads (original, thumbnail, large, medium, small)
+   * 
+   * @param stream The stream to ensure is closed (if it is a Readable stream)
+   * @param timeoutMs Optional timeout in milliseconds (default: 30000ms / 30 seconds)
+   */
+  private async ensureStreamClosed(stream: Readable | Buffer, timeoutMs: number = 30000): Promise<void> {
+    // If it's not a stream, nothing to do
+    if (!(stream instanceof Readable)) {
+      return;
+    }
+
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+    const isWindows = process.platform === 'win32';
+    
+    // Check if stream is already ended/closed
+    if (stream.readableEnded || stream.destroyed) {
+      if (isDebugEnabled) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] [DEBUG] Stream already ended or destroyed, no action needed`
+        );
+      }
+      return;
+    }
+
+    if (isDebugEnabled) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] [DEBUG] Ensuring stream is closed (Windows: ${isWindows})`
+      );
+    }
+
+    return new Promise<void>((resolve) => {
+      let resolved = false;
+      let timeoutHandle: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        if (resolved) return;
+        resolved = true;
+        
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+          timeoutHandle = null;
+        }
+
+        // Remove listeners to prevent memory leaks
+        stream.removeListener('end', onEnd);
+        stream.removeListener('error', onError);
+        stream.removeListener('close', onClose);
+      };
+
+      const onEnd = () => {
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Stream ended, closing stream`
+          );
+        }
+
+        // Try to close/destroy the stream explicitly
+        try {
+          // If stream has a close method (like fs.ReadStream), try to close it
+          if (typeof (stream as any).close === 'function') {
+            (stream as any).close();
+          }
+          // Destroy the stream to release file handles
+          if (!stream.destroyed) {
+            stream.destroy();
+          }
+        } catch (err) {
+          // Silently ignore errors (stream might already be closed)
+          if (isDebugEnabled) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] Error closing stream (ignored): ${errMsg}`
+            );
+          }
+        }
+
+        cleanup();
+        
+        // On Windows, add a small delay to ensure file handles are released
+        if (isWindows) {
+          // Small delay to allow Windows to release file handles
+          setTimeout(() => {
+            if (isDebugEnabled) {
+              this.logger.debug(
+                `[strapi-provider-upload-minio] [DEBUG] Stream closed, Windows file handle should be released`
+              );
+            }
+            resolve();
+          }, 10);
+        } else {
+          resolve();
+        }
+      };
+
+      const onClose = () => {
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Stream closed event received`
+          );
+        }
+        cleanup();
+        resolve();
+      };
+
+      const onError = (error: Error) => {
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Stream error (ignored for cleanup): ${error.message}`
+          );
+        }
+        // Try to clean up anyway
+        cleanup();
+        resolve(); // Resolve instead of reject - we want cleanup to complete
+      };
+
+      // Set up timeout to prevent hanging
+      timeoutHandle = setTimeout(() => {
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Stream close timeout after ${timeoutMs}ms, forcing cleanup`
+          );
+        }
+        
+        // Force cleanup
+        try {
+          if (!stream.destroyed) {
+            stream.destroy();
+          }
+        } catch (err) {
+          // Ignore errors
+        }
+        
+        cleanup();
+        resolve(); // Resolve instead of reject - we want cleanup to complete
+      }, timeoutMs);
+
+      // Listen for stream events
+      stream.once('end', onEnd);
+      stream.once('close', onClose);
+      stream.once('error', onError);
+
+      // If stream is already ended, trigger cleanup immediately
+      if (stream.readableEnded) {
+        onEnd();
+      } else if (stream.destroyed) {
+        onClose();
+      } else {
+        // If stream hasn't ended, try to consume any remaining data
+        // This helps ensure the stream completes
+        stream.resume();
+      }
     });
   }
 }

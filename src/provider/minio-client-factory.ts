@@ -18,14 +18,18 @@ export function createMinioClient(config: NormalizedConfig): MinioClient {
   // Create custom HTTP agent with timeout options if provided
   const connectTimeout = config.connectTimeout || 60000; // Default 60 seconds
 
-  const agentOptions = {
+  const agentOptions: https.AgentOptions | http.AgentOptions = {
     keepAlive: true,
     keepAliveMsecs: 1000,
     timeout: connectTimeout,
   };
 
   if (config.useSSL) {
-    clientOptions.transportAgent = new https.Agent(agentOptions);
+    // Add SSL-specific options for HTTPS agent
+    // rejectUnauthorized defaults to true (secure by default)
+    // Set to false only for self-signed certificates in dev/hmg environments
+    (agentOptions as https.AgentOptions).rejectUnauthorized = config.rejectUnauthorized;
+    clientOptions.transportAgent = new https.Agent(agentOptions as https.AgentOptions);
   } else {
     clientOptions.transportAgent = new http.Agent(agentOptions);
   }
@@ -40,6 +44,7 @@ export function createMinioClient(config: NormalizedConfig): MinioClient {
           endPoint: config.endPoint,
           port: config.port,
           useSSL: config.useSSL,
+          rejectUnauthorized: config.rejectUnauthorized,
           accessKeyLength: config.accessKey?.length,
           secretKeyLength: config.secretKey?.length,
           accessKeyPrefix: config.accessKey?.substring(0, 8),

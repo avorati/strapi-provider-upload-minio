@@ -121,9 +121,76 @@ describe("config-validator", () => {
         port: "not-a-number",
       });
 
-      expect(config.port).toBe(9000); // default port
+      expect(config.port).toBe(9000); // default port for HTTP
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Invalid port value")
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should use port 443 as default when useSSL is true and port is not specified", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        useSSL: true,
+      });
+
+      expect(config.port).toBe(443); // default port for HTTPS
+      expect(config.useSSL).toBe(true);
+    });
+
+    it("should use port 9000 as default when useSSL is false and port is not specified", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        useSSL: false,
+      });
+
+      expect(config.port).toBe(9000); // default port for HTTP
+      expect(config.useSSL).toBe(false);
+    });
+
+    it("should use port 443 as default when useSSL is true and port is invalid", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        useSSL: true,
+        port: 0,
+      });
+
+      expect(config.port).toBe(443); // default port for HTTPS
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Port 0 is out of valid range")
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should warn when useSSL is true but port is 9000 (HTTP default)", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        useSSL: true,
+        port: 9000,
+      });
+
+      expect(config.port).toBe(9000);
+      expect(config.useSSL).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("SSL is enabled (useSSL=true) but port is 9000")
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should warn when useSSL is false but port is 443 (HTTPS default)", () => {
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        useSSL: false,
+        port: 443,
+      });
+
+      expect(config.port).toBe(443);
+      expect(config.useSSL).toBe(false);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("SSL is disabled (useSSL=false) but port is 443")
       );
       consoleSpy.mockRestore();
     });
@@ -180,14 +247,14 @@ describe("config-validator", () => {
       }).toThrow(ConfigurationError);
     });
 
-    it("should use default port when port is invalid", () => {
+    it("should use default port when port is invalid (HTTP default)", () => {
       const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
       const config1 = validateAndNormalizeConfig({
         ...validConfig,
         port: 0,
       });
-      expect(config1.port).toBe(9000); // default
+      expect(config1.port).toBe(9000); // default for HTTP
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Port 0 is out of valid range")
       );
@@ -196,7 +263,7 @@ describe("config-validator", () => {
         ...validConfig,
         port: 65536,
       });
-      expect(config2.port).toBe(9000); // default
+      expect(config2.port).toBe(9000); // default for HTTP
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Port 65536 is out of valid range")
       );
@@ -205,7 +272,7 @@ describe("config-validator", () => {
         ...validConfig,
         port: 1.5,
       });
-      expect(config3.port).toBe(9000); // default
+      expect(config3.port).toBe(9000); // default for HTTP
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Port 1.5 is out of valid range")
       );

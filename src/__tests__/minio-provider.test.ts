@@ -21,6 +21,7 @@ describe("MinioProvider", () => {
     private: false,
     expiry: 3600,
     debug: false,
+    rejectUnauthorized: true,
   };
 
   const mockFile: StrapiFile = {
