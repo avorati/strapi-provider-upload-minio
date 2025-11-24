@@ -1,6 +1,7 @@
 import { ProviderOptions, StrapiProvider } from "./index.types";
 import { validateAndNormalizeConfig } from "./utils/config-validator";
 import { MinioProvider } from "./provider/minio-provider";
+import { createConsoleLogger } from "./utils/logger";
 
 /**
  * Initializes the MinIO upload provider for Strapi
@@ -8,7 +9,8 @@ import { MinioProvider } from "./provider/minio-provider";
 const provider = {
   init(providerOptions: ProviderOptions): StrapiProvider {
     const config = validateAndNormalizeConfig(providerOptions);
-    const minioProvider = new MinioProvider(config);
+    const logger = createConsoleLogger(config.debug);
+    const minioProvider = new MinioProvider(config, logger);
     
     // Return explicit object with methods bound to the instance
     // This ensures Strapi can properly access the methods

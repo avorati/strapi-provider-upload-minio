@@ -138,6 +138,7 @@ export interface NormalizedConfig {
   expiry: number;
   connectTimeout?: number; // Connection timeout in milliseconds
   requestTimeout?: number; // Request timeout in milliseconds (optional, for future use)
+  debug: boolean; // Enable verbose debug logging
 }
 
 /**
@@ -227,6 +228,7 @@ export function validateAndNormalizeConfig(
   // Normalize boolean values
   const useSSL = parseBoolean(options.useSSL);
   const isPrivate = parseBoolean(options.private);
+  const debug = parseBoolean(options.debug);
 
   // Validate private configuration
   if (isPrivate) {
@@ -331,6 +333,7 @@ export function validateAndNormalizeConfig(
     private: isPrivate,
     expiry,
     connectTimeout,
+    debug,
   };
 
   if (requestTimeout !== undefined) {
