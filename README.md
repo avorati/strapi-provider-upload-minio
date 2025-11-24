@@ -122,17 +122,19 @@ await strapi.plugin('upload').provider.upload(file, {
 
 ## 🔧 Configuration options
 
-| Option      | Type   | Required | Description                                 |
-|-------------|--------|----------|---------------------------------------------|
-| `endPoint`  | string | ✅       | MinIO server endpoint                       |
-| `port`      | number | ❌       | Server port (default: 9000 for HTTP, 443 for HTTPS) |
-| `useSSL`    | boolean| ❌       | Use HTTPS (default: false)                  |
-| `accessKey` | string | ✅       | MinIO access key                            |
-| `secretKey` | string | ✅       | MinIO secret key                            |
-| `bucket`    | string | ✅       | Bucket name to store files                  |
-| `folder`    | string | ❌       | Folder inside the bucket (optional)         |
-| `private`   | boolean| ❌       | Enable private file uploads (default: false) |
-| `expiry`    | number | ❌       | Signed URL expiry in seconds (default: 604800 = 7 days) |
+| Option           | Type   | Required | Description                                 |
+|------------------|--------|----------|---------------------------------------------|
+| `endPoint`       | string | ✅       | MinIO server endpoint                       |
+| `port`           | number | ❌       | Server port (default: 9000 for HTTP, 443 for HTTPS) |
+| `useSSL`         | boolean| ❌       | Use HTTPS (default: false)                  |
+| `accessKey`      | string | ✅       | MinIO access key                            |
+| `secretKey`      | string | ✅       | MinIO secret key                            |
+| `bucket`         | string | ✅       | Bucket name to store files                  |
+| `folder`         | string | ❌       | Folder inside the bucket (optional)         |
+| `private`        | boolean| ❌       | Enable private file uploads (default: false) |
+| `expiry`         | number | ❌       | Signed URL expiry in seconds (default: 604800 = 7 days) |
+| `connectTimeout` | number | ❌       | Connection timeout in milliseconds (default: 60000 = 60 seconds) |
+| `requestTimeout` | number | ❌       | Request timeout in milliseconds (optional, for future use) |
 
 ## 🐳 Docker Compose - MinIO for development
 

@@ -60,6 +60,8 @@ export interface ProviderOptions {
   folder?: string;
   private?: boolean | string;
   expiry?: number | string;
+  connectTimeout?: number | string; // Connection timeout in milliseconds
+  requestTimeout?: number | string; // Request timeout in milliseconds (optional, for future use)
 }
 
 export interface SignedUrlResponse {
