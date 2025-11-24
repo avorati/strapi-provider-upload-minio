@@ -36,7 +36,7 @@ Crie ou edite o arquivo `config/plugins.ts` (ou `.js`):
 export default {
   upload: {
     config: {
-      provider: 'strapi-provider-upload-minio',
+      provider: '@avorati/strapi-provider-upload-minio',
       providerOptions: {
         endPoint: process.env.MINIO_ENDPOINT || 'localhost',
         port: parseInt(process.env.MINIO_PORT || '9000'),
