@@ -3,6 +3,7 @@ import {
   extractFilePathFromUrl,
 } from "../utils/path-builder";
 import { StrapiFile } from "../index.types";
+import { PathTraversalError } from "../errors/provider-errors";
 
 describe("path-builder", () => {
   const baseFile: StrapiFile = {
@@ -34,6 +35,86 @@ describe("path-builder", () => {
     it("should handle nested folders", () => {
       const path = buildUploadPath(baseFile, "uploads/images");
       expect(path).toBe("uploads/images/abc123.jpg");
+    });
+
+    it("should prevent path traversal attacks in folder", () => {
+      expect(() => {
+        buildUploadPath(baseFile, "../../../etc");
+      }).toThrow(PathTraversalError);
+    });
+
+    it("should prevent path traversal attacks in file path", () => {
+      const file = { ...baseFile, path: "../../../etc" };
+      expect(() => {
+        buildUploadPath(file, "uploads");
+      }).toThrow(PathTraversalError);
+    });
+
+    it("should prevent path traversal attacks in hash", () => {
+      const file = { ...baseFile, hash: "../../../etc/passwd" };
+      expect(() => {
+        buildUploadPath(file, "uploads");
+      }).toThrow(PathTraversalError);
+    });
+
+    it("should prevent absolute paths starting with slash", () => {
+      expect(() => {
+        buildUploadPath(baseFile, "/etc/passwd");
+      }).toThrow(PathTraversalError);
+    });
+
+    it("should prevent absolute paths starting with backslash", () => {
+      expect(() => {
+        buildUploadPath(baseFile, "\\windows\\system32");
+      }).toThrow(PathTraversalError);
+    });
+
+    it("should sanitize double slashes", () => {
+      const path = buildUploadPath(baseFile, "uploads//images");
+      expect(path).toBe("uploads/images/abc123.jpg");
+    });
+
+    it("should sanitize mixed slashes", () => {
+      const file = { ...baseFile, path: "2024\\01" };
+      const path = buildUploadPath(file, "uploads");
+      expect(path).toBe("uploads/2024/01/abc123.jpg");
+    });
+
+    it("should trim whitespace from folder", () => {
+      const path = buildUploadPath(baseFile, "  uploads  ");
+      expect(path).toBe("uploads/abc123.jpg");
+    });
+
+    it("should handle extension without leading dot", () => {
+      const file = { ...baseFile, ext: "jpg" };
+      const path = buildUploadPath(file, "uploads");
+      expect(path).toBe("uploads/abc123.jpg");
+    });
+
+    it("should throw error for missing hash", () => {
+      const file = { ...baseFile, hash: "" };
+      expect(() => {
+        buildUploadPath(file, "uploads");
+      }).toThrow(PathTraversalError);
+    });
+
+    it("should throw error for missing extension", () => {
+      const file = { ...baseFile, ext: "" };
+      expect(() => {
+        buildUploadPath(file, "uploads");
+      }).toThrow(PathTraversalError);
+    });
+
+    it("should remove null bytes from paths", () => {
+      const file = { ...baseFile, path: "2024" + "\x00" + "abc" };
+      const path = buildUploadPath(file, "uploads");
+      expect(path).toBe("uploads/2024abc/abc123.jpg");
+    });
+
+    it("should remove control characters from paths", () => {
+      const file = { ...baseFile, path: "2024\x1Fabc" };
+      const path = buildUploadPath(file, "uploads");
+      expect(path).toBe("uploads/2024abc/abc123.jpg");
     });
   });
 

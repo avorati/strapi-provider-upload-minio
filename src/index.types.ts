@@ -1,12 +1,41 @@
 import { ReadStream } from "fs";
 
+/**
+ * Format metadata for image variations (thumbnails, etc.)
+ */
+export interface ImageFormat {
+  name: string;
+  hash: string;
+  ext: string;
+  mime: string;
+  width: number;
+  height: number;
+  size: number;
+  path?: string;
+  url?: string;
+}
+
+/**
+ * File metadata structure
+ */
+export interface FileMetadata {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+/**
+ * Provider-specific metadata
+ */
+export interface ProviderMetadata {
+  [key: string]: unknown;
+}
+
 export interface StrapiFile {
   name: string;
   alternativeText?: string;
   caption?: string;
   width?: number;
   height?: number;
-  formats?: Record<string, any>;
+  formats?: Record<string, ImageFormat>;
   hash: string;
   ext: string;
   mime: string;
@@ -14,11 +43,11 @@ export interface StrapiFile {
   url?: string;
   previewUrl?: string;
   provider: string;
-  provider_metadata?: Record<string, any>;
+  provider_metadata?: ProviderMetadata;
   stream?: ReadStream;
   buffer?: Buffer;
   path?: string;
-  metadata?: Record<string, any>;
+  metadata?: FileMetadata;
 }
 
 export interface ProviderOptions {

@@ -22,6 +22,8 @@ Upload provider for Strapi v5 that allows storing files in MinIO (S3-compatible 
 - ✅ Custom metadata
 - ✅ TypeScript support
 - ✅ Large file streaming
+- ✅ Path sanitization and security validation
+- ✅ Bucket existence caching for performance
 
 ## 📦 Installation
 
@@ -30,6 +32,12 @@ npm install @avorati/strapi-provider-upload-minio
 # or
 yarn add @avorati/strapi-provider-upload-minio
 ```
+
+### Requirements
+
+- **Node.js**: >= 22.0.0 (see `package.json` engines)
+- **Strapi**: >= 5.0.0
+- **MinIO**: Any version compatible with S3 API
 
 ## ⚙️ Configuration
 
@@ -182,6 +190,122 @@ Configure CORS in MinIO to allow frontend access:
 
 ```bash
 mc admin config set myminio api cors_allow_origin="*"
+```
+
+### Path Sanitization
+
+The provider automatically sanitizes file paths to prevent path traversal attacks. All uploaded file paths are validated and normalized:
+
+- Paths are sanitized to prevent `../` and other traversal attempts
+- Invalid characters and control characters are removed
+- Double slashes and mixed path separators are normalized
+
+### Input Validation
+
+The provider validates all configuration inputs:
+
+- **Endpoint**: Must be a valid hostname or IP address (IPv4 or IPv6)
+- **Bucket name**: Must follow S3/MinIO naming rules:
+  - 3-63 characters long
+  - Lowercase letters, numbers, dots (.), and hyphens (-)
+  - Must start and end with a letter or number
+  - Cannot be formatted as an IP address
+- **Credentials**: Cannot be empty after trimming whitespace
+
+## 📋 Limits and Constraints
+
+### Bucket Naming Rules
+
+Bucket names must comply with S3/MinIO naming conventions:
+
+- Length: 3-63 characters
+- Characters: lowercase letters (a-z), numbers (0-9), dots (.), hyphens (-)
+- Cannot start or end with a dot or hyphen
+- Cannot contain consecutive dots (..)
+- Cannot be formatted as an IP address (e.g., 192.168.1.1)
+
+### File Path Constraints
+
+- Maximum path length: Determined by MinIO/S3 limits
+- Path sanitization: All paths are automatically sanitized
+- Forbidden characters: Path traversal sequences (../, ~, absolute paths) are blocked
+
+### Performance Considerations
+
+- **Bucket existence check**: Cached for 5 minutes to reduce overhead
+- **Large files**: Supported via streaming (no size limit enforced by provider)
+- **Connection pooling**: MinIO client handles connection management
+
+## ⚠️ Error Handling
+
+The provider uses custom error classes for better error handling:
+
+### Error Types
+
+#### ConfigurationError
+Thrown when configuration is invalid:
+- Missing required fields
+- Invalid endpoint format
+- Invalid bucket name
+- Empty values after trimming
+
+```typescript
+try {
+  // Provider initialization
+} catch (error) {
+  if (error instanceof ConfigurationError) {
+    console.error('Configuration error:', error.message);
+    console.error('Context:', error.context);
+  }
+}
+```
+
+#### UploadError
+Thrown when file upload fails:
+- Bucket doesn't exist
+- Network issues
+- Permission errors
+
+```typescript
+try {
+  await strapi.plugin('upload').provider.upload(file);
+} catch (error) {
+  if (error instanceof UploadError) {
+    console.error('Upload failed:', error.message);
+    console.error('Details:', error.context);
+  }
+}
+```
+
+#### DeleteError
+Thrown when file deletion fails:
+- File not found
+- Permission errors
+
+#### SignedUrlError
+Thrown when signed URL generation fails:
+- Invalid expiry time
+- Permission errors
+- File not found
+
+#### PathTraversalError
+Thrown when path sanitization detects a security threat:
+- Path traversal attempts (../)
+- Invalid characters in paths
+
+### Error Context
+
+All errors include a `context` property with additional details:
+
+```typescript
+{
+  message: "Error description",
+  context: {
+    fileName: "example.jpg",
+    bucket: "my-bucket",
+    suggestion: "Helpful suggestion"
+  }
+}
 ```
 
 ## 🛠️ Development
