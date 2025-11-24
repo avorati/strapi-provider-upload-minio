@@ -130,6 +130,7 @@ export function buildUploadPath(
 
 /**
  * Extracts the file path from a MinIO URL
+ * Removes query string parameters and URL fragments to get only the file path
  */
 export function extractFilePathFromUrl(
   url: string,
@@ -140,7 +141,25 @@ export function extractFilePathFromUrl(
     throw new Error("File URL is required for path extraction");
   }
 
+  // Decode URL-encoded characters (e.g., %3F becomes ?)
+  let decodedUrl = decodeURIComponent(url);
+
+  // Remove query string parameters (everything after ?)
+  const queryIndex = decodedUrl.indexOf("?");
+  if (queryIndex !== -1) {
+    decodedUrl = decodedUrl.substring(0, queryIndex);
+  }
+
+  // Remove URL fragment (everything after #)
+  const fragmentIndex = decodedUrl.indexOf("#");
+  if (fragmentIndex !== -1) {
+    decodedUrl = decodedUrl.substring(0, fragmentIndex);
+  }
+
+  // Extract the file path by removing the bucket prefix
   const bucketPrefix = `${hostUrl}${bucket}/`;
-  return url.replace(bucketPrefix, "");
+  const filePath = decodedUrl.replace(bucketPrefix, "");
+
+  return filePath;
 }
 
