@@ -38,7 +38,7 @@ export default {
     config: {
       provider: '@avorati/strapi-provider-upload-minio',
       providerOptions: {
-        endPoint: process.env.MINIO_ENDPOINT || 'localhost',
+        host: process.env.MINIO_HOST || process.env.MINIO_ENDPOINT || 'localhost',
         port: parseInt(process.env.MINIO_PORT || '9000'),
         useSSL: process.env.MINIO_USE_SSL === 'true',
         accessKey: process.env.MINIO_ACCESS_KEY,
@@ -62,7 +62,7 @@ cp .env.example .env
 Adicione as seguintes variáveis ao seu arquivo `.env`:
 
 ```env
-MINIO_ENDPOINT=localhost
+MINIO_HOST=localhost
 MINIO_PORT=9000
 MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=minioadmin
@@ -111,7 +111,7 @@ await strapi.plugin('upload').provider.upload(file, {
 
 | Opção | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
-| `endPoint` | string | ✅ | Endpoint do servidor MinIO |
+| `host` ou `endPoint` | string | ✅ | Endpoint do servidor MinIO (pode usar qualquer um) |
 | `port` | number | ❌ | Porta do servidor (padrão: 9000 para HTTP, 443 para HTTPS) |
 | `useSSL` | boolean | ❌ | Usar HTTPS (padrão: false) |
 | `accessKey` | string | ✅ | Chave de acesso do MinIO |

@@ -51,7 +51,8 @@ export interface StrapiFile {
 }
 
 export interface ProviderOptions {
-  endPoint: string;
+  endPoint?: string; // MinIO server endpoint (or use host)
+  host?: string; // Alternative to endPoint (alias)
   port?: number | string;
   useSSL?: boolean | string;
   accessKey: string;
