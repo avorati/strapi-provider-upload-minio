@@ -1,5 +1,6 @@
 import { ConfigurationError } from "../errors/provider-errors";
 import { ProviderOptions } from "../index.types";
+import { getLogger } from "./logger";
 
 const DEFAULT_PORT = 9000;
 const DEFAULT_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -169,27 +170,55 @@ export function validateAndNormalizeConfig(
     });
   }
 
-  // Validate port
-  const port = options.port !== undefined ? options.port : DEFAULT_PORT;
+  const logger = getLogger();
+
+  // Parse and validate port
+  let port: number;
+  if (options.port === undefined) {
+    port = DEFAULT_PORT;
+  } else {
+    const parsedPort = parseNumber(options.port);
+    if (parsedPort === undefined) {
+      logger.warn(
+        `[strapi-provider-upload-minio] Warning: Invalid port value "${options.port}". Using default port ${DEFAULT_PORT}.`
+      );
+      port = DEFAULT_PORT;
+    } else {
+      port = parsedPort;
+    }
+  }
   if (
     typeof port !== "number" ||
     port < MIN_PORT ||
     port > MAX_PORT ||
     !Number.isInteger(port)
   ) {
-    throw new ConfigurationError(
-      `port must be an integer between ${MIN_PORT} and ${MAX_PORT}`,
-      { provided: port }
+    logger.warn(
+      `[strapi-provider-upload-minio] Warning: Port ${port} is out of valid range (${MIN_PORT}-${MAX_PORT}). Using default port ${DEFAULT_PORT}.`
     );
+    port = DEFAULT_PORT;
   }
 
-  // Validate expiry
-  const expiry = options.expiry !== undefined ? options.expiry : DEFAULT_EXPIRY;
+  // Parse and validate expiry
+  let expiry: number;
+  if (options.expiry === undefined) {
+    expiry = DEFAULT_EXPIRY;
+  } else {
+    const parsedExpiry = parseNumber(options.expiry);
+    if (parsedExpiry === undefined) {
+      logger.warn(
+        `[strapi-provider-upload-minio] Warning: Invalid expiry value "${options.expiry}". Using default expiry ${DEFAULT_EXPIRY} seconds (${DEFAULT_EXPIRY / (24 * 60 * 60)} days).`
+      );
+      expiry = DEFAULT_EXPIRY;
+    } else {
+      expiry = parsedExpiry;
+    }
+  }
   if (typeof expiry !== "number" || expiry <= 0 || !Number.isInteger(expiry)) {
-    throw new ConfigurationError(
-      "expiry must be a positive integer (seconds)",
-      { provided: expiry }
+    logger.warn(
+      `[strapi-provider-upload-minio] Warning: Expiry ${expiry} is invalid (must be a positive integer). Using default expiry ${DEFAULT_EXPIRY} seconds (${DEFAULT_EXPIRY / (24 * 60 * 60)} days).`
     );
+    expiry = DEFAULT_EXPIRY;
   }
 
   // Normalize boolean values
@@ -269,6 +298,21 @@ export function validateAndNormalizeConfig(
     private: isPrivate,
     expiry,
   };
+}
+
+/**
+ * Parses a number value from various formats (number, string, undefined)
+ * Converts string representations of numbers to actual numbers
+ */
+function parseNumber(value: number | string | undefined): number | undefined {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return undefined;
+    const parsed = Number(trimmed);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return undefined;
 }
 
 /**

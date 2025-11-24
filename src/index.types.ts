@@ -52,14 +52,14 @@ export interface StrapiFile {
 
 export interface ProviderOptions {
   endPoint: string;
-  port?: number;
+  port?: number | string;
   useSSL?: boolean | string;
   accessKey: string;
   secretKey: string;
   bucket: string;
   folder?: string;
   private?: boolean | string;
-  expiry?: number;
+  expiry?: number | string;
 }
 
 export interface SignedUrlResponse {
