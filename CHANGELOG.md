@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [1.6.0](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.5.1...v1.6.0) (2025-11-24)
+
+
+### Features
+
+* add verbose debug logging and update MinIO to 8.0.6 ([bcaba67](https://github.com/avorati/strapi-provider-upload-minio/commit/bcaba673d4a863200c09c3cab675b6ae0fb2c09b))
+
+## [1.5.1](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.5.0...v1.5.1) (2025-11-24)
+
+
+### Bug Fixes
+
+* resolve MinIO upload timeout issues and improve compatibility ([0a71d8b](https://github.com/avorati/strapi-provider-upload-minio/commit/0a71d8b1fbdafe70289d12259c957a34bcd55009))
+
+# [1.5.0](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.5...v1.5.0) (2025-11-24)
+
+
+### Features
+
+* add configurable connection and request timeouts support ([359b5f3](https://github.com/avorati/strapi-provider-upload-minio/commit/359b5f39e2398f8c732ec78bd7556533630fe79c))
+
+## [1.4.5](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.4...v1.4.5) (2025-11-24)
+
+
+### Bug Fixes
+
+* generate signed URLs for legacy images when server is private ([4f4b2ac](https://github.com/avorati/strapi-provider-upload-minio/commit/4f4b2ac164d87a0d10b1c96c5f2f395b1bbd9bf8))
+
+## [1.4.4](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.3...v1.4.4) (2025-11-24)
+
+
+### Bug Fixes
+
+* remove query parameters from URL when extracting file path ([2e46da4](https://github.com/avorati/strapi-provider-upload-minio/commit/2e46da4df08ecb30db297209e602a799a0078e0b))
+* update integration test to use CommonJS require ([6ee0d53](https://github.com/avorati/strapi-provider-upload-minio/commit/6ee0d53cb356037517bf7db687096649245211c9))
+
+## [1.4.3](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.2...v1.4.3) (2025-11-24)
+
+
+### Bug Fixes
+
+* return explicit object literal with bound methods from init ([59d3201](https://github.com/avorati/strapi-provider-upload-minio/commit/59d3201a49f2069cbfe08c25aa962268f5a0e5a8))
+
+## [1.4.2](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.1...v1.4.2) (2025-11-24)
+
+
+### Bug Fixes
+
+* remove ES module export to ensure CommonJS compatibility with Strapi ([74473ba](https://github.com/avorati/strapi-provider-upload-minio/commit/74473ba9f40ea2f114cc5a43a20a873941795beb))
+
+## [1.4.1](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.0...v1.4.1) (2025-11-24)
+
+
+### Bug Fixes
+
+* allow string values for expiry and port config, add commitlint validation ([1da0069](https://github.com/avorati/strapi-provider-upload-minio/commit/1da00693bfc286b1795bb79d84f83a1d815b4d19))
+
+# [1.4.0](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.3.0...v1.4.0) (2025-11-24)
+
+
+### Bug Fixes
+
+* corrigir exportação do provider para CommonJS e melhorias de segurança ([042edb8](https://github.com/avorati/strapi-provider-upload-minio/commit/042edb89c50aa95b536b1c7caf225def911d065e))
+
+
+### Features
+
+* improve IPv6 validation and bucket warning logging ([0ef6b4b](https://github.com/avorati/strapi-provider-upload-minio/commit/0ef6b4bbdefddc9bd0e4d762be86d630e685f02a))
+
 ## [Unreleased]
 
 ## [1.3.0](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.2.1...v1.3.0) - 2025-11-24
