@@ -95,7 +95,8 @@
       "@semantic-release/github",
       {
         "successComment": false,
-        "releasedLabels": false
+        "releasedLabels": false,
+        "repositoryUrl": "https://github.com/avorati/strapi-provider-upload-minio"
       }
     ]
   ]
