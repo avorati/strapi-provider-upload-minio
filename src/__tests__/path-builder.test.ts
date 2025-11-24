@@ -142,6 +142,50 @@ describe("path-builder", () => {
         extractFilePathFromUrl("", "http://localhost:9000/", "test-bucket");
       }).toThrow("File URL is required for path extraction");
     });
+
+    it("should extract file path from signed URL with query parameters", () => {
+      const signedUrl =
+        "http://localhost:9000/test-bucket/uploads/abc123.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=test%2F20251124%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20251124T020616Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=test123";
+      const path = extractFilePathFromUrl(
+        signedUrl,
+        "http://localhost:9000/",
+        "test-bucket"
+      );
+      expect(path).toBe("uploads/abc123.jpg");
+    });
+
+    it("should extract file path from URL with encoded query parameters", () => {
+      const urlWithEncodedQuery =
+        "http://localhost:9000/test-bucket/memory/file.jpg%3FX-Amz-Algorithm%3DAWS4-HMAC-SHA256";
+      const path = extractFilePathFromUrl(
+        urlWithEncodedQuery,
+        "http://localhost:9000/",
+        "test-bucket"
+      );
+      expect(path).toBe("memory/file.jpg");
+    });
+
+    it("should extract file path from URL with fragment", () => {
+      const urlWithFragment =
+        "http://localhost:9000/test-bucket/uploads/file.jpg#section";
+      const path = extractFilePathFromUrl(
+        urlWithFragment,
+        "http://localhost:9000/",
+        "test-bucket"
+      );
+      expect(path).toBe("uploads/file.jpg");
+    });
+
+    it("should extract file path from signed URL with both query and fragment", () => {
+      const signedUrl =
+        "http://localhost:9000/test-bucket/file.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256#fragment";
+      const path = extractFilePathFromUrl(
+        signedUrl,
+        "http://localhost:9000/",
+        "test-bucket"
+      );
+      expect(path).toBe("file.jpg");
+    });
   });
 });
 
