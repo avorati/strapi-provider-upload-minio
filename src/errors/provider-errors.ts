@@ -6,7 +6,10 @@ export class ProviderError extends Error {
   constructor(message: string, public readonly context?: Record<string, unknown>) {
     super(message);
     this.name = this.constructor.name;
-    Error.captureStackTrace(this, this.constructor);
+    // Use captureStackTrace if available, otherwise fallback
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
   }
 }
 
@@ -31,6 +34,12 @@ export class DeleteError extends ProviderError {
 export class SignedUrlError extends ProviderError {
   constructor(message: string, context?: Record<string, unknown>) {
     super(`Signed URL error: ${message}`, context);
+  }
+}
+
+export class PathTraversalError extends ProviderError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(`Path traversal error: ${message}`, context);
   }
 }
 

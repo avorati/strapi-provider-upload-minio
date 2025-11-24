@@ -68,8 +68,9 @@ jobs:
     - name: Install dependencies
       run: yarn install --frozen-lockfile
 
-    - name: Run tests
-      run: yarn test
+    - name: Run tests with coverage
+      run: yarn test --coverage
+      continue-on-error: false
 
     - name: Build project
       run: yarn build
@@ -85,8 +86,11 @@ jobs:
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
-      if: matrix.node-version == '22.x'
+      if: matrix.node-version == '22.x' && always()
       with:
         file: ./coverage/lcov.info
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
+        verbose: true
+        flags: unittests
+      continue-on-error: true

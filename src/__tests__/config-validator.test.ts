@@ -160,6 +160,154 @@ describe("config-validator", () => {
         });
       }).toThrow(ConfigurationError);
     });
+
+    it("should throw ConfigurationError when endPoint is empty after trim", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          endPoint: "   ",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError when accessKey is empty after trim", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          accessKey: "   ",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError when secretKey is empty after trim", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          secretKey: "   ",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError when bucket is empty after trim", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "   ",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should accept valid hostname", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "example.com",
+      });
+      expect(config.endPoint).toBe("example.com");
+    });
+
+    it("should accept localhost", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "localhost",
+      });
+      expect(config.endPoint).toBe("localhost");
+    });
+
+    it("should accept valid IPv4 address", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "192.168.1.1",
+      });
+      expect(config.endPoint).toBe("192.168.1.1");
+    });
+
+    it("should accept valid IPv6 address", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "::1",
+      });
+      expect(config.endPoint).toBe("::1");
+    });
+
+    it("should throw ConfigurationError for invalid hostname", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          endPoint: "invalid..hostname",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should accept valid bucket name", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        bucket: "my-bucket-123",
+      });
+      expect(config.bucket).toBe("my-bucket-123");
+    });
+
+    it("should throw ConfigurationError for bucket name shorter than 3 characters", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "ab",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError for bucket name longer than 63 characters", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "a".repeat(64),
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError for bucket name starting with hyphen", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "-invalid-bucket",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError for bucket name ending with hyphen", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "invalid-bucket-",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError for bucket name as IP address", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "192.168.1.1",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError for bucket name with consecutive dots", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "invalid..bucket",
+        });
+      }).toThrow(ConfigurationError);
+    });
+
+    it("should throw ConfigurationError for bucket name with uppercase letters", () => {
+      expect(() => {
+        validateAndNormalizeConfig({
+          ...validConfig,
+          bucket: "Invalid-Bucket",
+        });
+      }).toThrow(ConfigurationError);
+    });
   });
 });
 
