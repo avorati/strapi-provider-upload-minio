@@ -229,6 +229,36 @@ describe("config-validator", () => {
       expect(config.endPoint).toBe("::1");
     });
 
+    it("should accept IPv6 address ending with ::", () => {
+      const config1 = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "2001:db8::",
+      });
+      expect(config1.endPoint).toBe("2001:db8::");
+
+      const config2 = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "fe80::",
+      });
+      expect(config2.endPoint).toBe("fe80::");
+    });
+
+    it("should accept IPv6 address with compression in the middle", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "2001:db8::8a2e:370:7334",
+      });
+      expect(config.endPoint).toBe("2001:db8::8a2e:370:7334");
+    });
+
+    it("should accept full IPv6 address", () => {
+      const config = validateAndNormalizeConfig({
+        ...validConfig,
+        endPoint: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+      });
+      expect(config.endPoint).toBe("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+    });
+
     it("should throw ConfigurationError for invalid hostname", () => {
       expect(() => {
         validateAndNormalizeConfig({

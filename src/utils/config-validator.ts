@@ -17,11 +17,48 @@ function isValidIPv4(ip: string): boolean {
 
 /**
  * Validates if a string is a valid IPv6 address (basic validation)
+ * Supports:
+ * - Full addresses (8 groups): 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+ * - Compressed addresses: 2001:db8::8a2e:370:7334
+ * - Addresses ending with :: : 2001:db8:: or fe80::
+ * - Addresses starting with :: : ::1 or ::
  */
 function isValidIPv6(ip: string): boolean {
-  const ipv6Regex =
-    /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$|^(?:[0-9a-fA-F]{1,4}:)*::(?:[0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4}$/;
-  return ipv6Regex.test(ip);
+  // Check for :: (compression marker) - only one allowed
+  const compressionCount = (ip.match(/::/g) || []).length;
+  if (compressionCount > 1) {
+    return false;
+  }
+
+  // Split by :: to get parts before and after compression
+  const parts = ip.split("::");
+  
+  if (parts.length === 1) {
+    // No compression - must be full 8 groups
+    const groups = parts[0].split(":");
+    if (groups.length !== 8) {
+      return false;
+    }
+    return groups.every((group) => /^[0-9a-fA-F]{1,4}$/.test(group));
+  }
+
+  // Has compression
+  const before = parts[0] ? parts[0].split(":").filter((g) => g.length > 0) : [];
+  const after = parts[1] ? parts[1].split(":").filter((g) => g.length > 0) : [];
+  
+  // Total groups (before + after) must be <= 7 (since :: represents missing groups)
+  const totalGroups = before.length + after.length;
+  if (totalGroups > 7) {
+    return false;
+  }
+
+  // Validate all groups are valid hex (1-4 hex digits)
+  const hexGroupPattern = /^[0-9a-fA-F]{1,4}$/;
+  const allGroupsValid = 
+    before.every((group) => hexGroupPattern.test(group)) &&
+    after.every((group) => hexGroupPattern.test(group));
+
+  return allGroupsValid;
 }
 
 /**

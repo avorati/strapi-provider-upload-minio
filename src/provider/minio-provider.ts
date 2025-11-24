@@ -77,8 +77,10 @@ export class MinioProvider implements StrapiProvider {
   /**
    * Checks if the bucket exists with optional logging and caching
    * This method never throws errors to avoid breaking Strapi initialization
-   * @param silent If true, errors are silently ignored (no logging)
+   * @param silent If true, connection errors are silently ignored (no logging)
    * @param useCache If true, uses cached result if available and valid
+   * Note: Bucket existence warnings are always logged regardless of silent parameter
+   *       since silent only controls error logging, not bucket existence warnings
    */
   private async checkBucketExists(
     silent: boolean = false,
@@ -87,7 +89,9 @@ export class MinioProvider implements StrapiProvider {
     // Check cache first if enabled
     if (useCache && this.isBucketCheckCacheValid()) {
       const cached = this.bucketCheckCache!;
-      if (!cached.exists && !silent) {
+      // Always log bucket existence warnings, even when silent=true
+      // silent only controls error logging, not bucket existence warnings
+      if (!cached.exists) {
         this.logger.warn(
           `[strapi-provider-upload-minio] Warning: Bucket "${this.config.bucket}" does not exist (cached). Uploads will fail.`
         );
@@ -104,6 +108,8 @@ export class MinioProvider implements StrapiProvider {
         timestamp: Date.now(),
       };
 
+      // Always log bucket existence warnings, even when silent=true
+      // silent only controls error logging, not bucket existence warnings
       if (!exists) {
         const message = silent
           ? `Upload will fail. Please create the bucket first.`
@@ -114,6 +120,7 @@ export class MinioProvider implements StrapiProvider {
       }
     } catch (error) {
       // Only log warning if not silent - we don't want to break Strapi
+      // silent controls error logging (connection issues, etc.)
       if (!silent) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
