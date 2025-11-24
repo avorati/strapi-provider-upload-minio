@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.5.0...v1.5.1) (2025-11-24)
+
+
+### Bug Fixes
+
+* resolve MinIO upload timeout issues and improve compatibility ([0a71d8b](https://github.com/avorati/strapi-provider-upload-minio/commit/0a71d8b1fbdafe70289d12259c957a34bcd55009))
+
 # [1.5.0](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.4.5...v1.5.0) (2025-11-24)
 
 
