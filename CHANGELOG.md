@@ -1,3 +1,17 @@
+# [1.3.0](https://github.com/avorati/strapi-provider-upload-minio/compare/v1.2.1...v1.3.0) (2025-11-24)
+
+
+### Bug Fixes
+
+* add authentication and repository URL for semantic-release ([9380e7e](https://github.com/avorati/strapi-provider-upload-minio/commit/9380e7e38f625dcd11412c7f70e487dfe4b5c98c))
+* downgrade @semantic-release/github to support Node.js 20 ([fa59b41](https://github.com/avorati/strapi-provider-upload-minio/commit/fa59b41ca9b2ce3fa948ba595185974cbccfae87))
+* remove Node.js 20 from CI matrix ([90adf56](https://github.com/avorati/strapi-provider-upload-minio/commit/90adf56951902c8c329c67519f66147f87b06466))
+
+
+### Features
+
+* improve provider with bucket validation, custom metadata, and better error messages ([e055914](https://github.com/avorati/strapi-provider-upload-minio/commit/e055914d3aff8884c1253994a0a736c46267a2dd))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
