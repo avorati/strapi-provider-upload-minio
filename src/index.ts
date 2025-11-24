@@ -12,9 +12,6 @@ const provider = {
   },
 };
 
-// Export for ES modules
-export default provider;
-
 // Export for CommonJS (required by Strapi)
-// This ensures compatibility with both ES modules and CommonJS
+// This must be the primary export for Strapi to work correctly
 module.exports = provider;
