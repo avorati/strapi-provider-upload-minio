@@ -216,6 +216,80 @@ describe("MinioProvider", () => {
         SignedUrlError
       );
     });
+
+    it("should generate signed URL for legacy file with different endpoint", async () => {
+      // Legacy URL with different hostname but same bucket in pathname
+      mockFile.url =
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/CAPA_LINHA_DO_TEMPO_01_d48d674690.png";
+
+      // Update config to match the bucket
+      const legacyConfig = { ...config, bucket: "sitememoria-hmg" };
+      const legacyProvider = new MinioProvider(legacyConfig);
+
+      mockClient.presignedGetObject.mockResolvedValue(
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/CAPA_LINHA_DO_TEMPO_01_d48d674690.png?X-Amz-Algorithm=..."
+      );
+
+      const result = await legacyProvider.getSignedUrl(mockFile);
+
+      expect(mockClient.presignedGetObject).toHaveBeenCalledWith(
+        "sitememoria-hmg",
+        "memory/CAPA_LINHA_DO_TEMPO_01_d48d674690.png",
+        3600
+      );
+      expect(result.url).toContain("X-Amz-Algorithm");
+    });
+
+    it("should return original URL for already signed legacy URL when no custom expiry", async () => {
+      const alreadySignedUrl =
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/file.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=test";
+      mockFile.url = alreadySignedUrl;
+
+      const legacyConfig = { ...config, bucket: "sitememoria-hmg" };
+      const legacyProvider = new MinioProvider(legacyConfig);
+
+      const result = await legacyProvider.getSignedUrl(mockFile);
+
+      // Should return original URL without regenerating
+      expect(result.url).toBe(alreadySignedUrl);
+      expect(mockClient.presignedGetObject).not.toHaveBeenCalled();
+    });
+
+    it("should regenerate signed URL for legacy file when custom expiry is provided", async () => {
+      const alreadySignedUrl =
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/file.png?X-Amz-Algorithm=AWS4-HMAC-SHA256";
+      mockFile.url = alreadySignedUrl;
+
+      const legacyConfig = { ...config, bucket: "sitememoria-hmg" };
+      const legacyProvider = new MinioProvider(legacyConfig);
+
+      mockClient.presignedGetObject.mockResolvedValue(
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/file.png?X-Amz-Algorithm=...&X-Amz-Expires=1800"
+      );
+
+      const result = await legacyProvider.getSignedUrl(mockFile, {
+        expiresIn: 1800,
+      });
+
+      // Should regenerate with custom expiry
+      expect(mockClient.presignedGetObject).toHaveBeenCalledWith(
+        "sitememoria-hmg",
+        "memory/file.png",
+        1800
+      );
+      expect(result.url).toContain("X-Amz-Algorithm");
+    });
+
+    it("should handle legacy URL extraction failure gracefully", async () => {
+      // URL that doesn't match expected structure
+      mockFile.url = "https://external-site.com/random/path/file.jpg";
+
+      const result = await provider.getSignedUrl(mockFile);
+
+      // Should return original URL without throwing
+      expect(result.url).toBe("https://external-site.com/random/path/file.jpg");
+      expect(mockClient.presignedGetObject).not.toHaveBeenCalled();
+    });
   });
 });
 

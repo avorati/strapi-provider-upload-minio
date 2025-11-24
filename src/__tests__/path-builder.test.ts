@@ -186,6 +186,40 @@ describe("path-builder", () => {
       );
       expect(path).toBe("file.jpg");
     });
+
+    it("should extract file path from legacy URL with different endpoint", () => {
+      // Legacy URL with different hostname but same bucket structure
+      const legacyUrl =
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/CAPA_LINHA_DO_TEMPO_01_d48d674690.png";
+      const path = extractFilePathFromUrl(
+        legacyUrl,
+        "http://localhost:9000/", // Different hostUrl
+        "sitememoria-hmg"
+      );
+      expect(path).toBe("memory/CAPA_LINHA_DO_TEMPO_01_d48d674690.png");
+    });
+
+    it("should extract file path from legacy URL using pathname when hostUrl doesn't match", () => {
+      const legacyUrl =
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/file.png";
+      const path = extractFilePathFromUrl(
+        legacyUrl,
+        "http://different-host:9000/", // Completely different hostUrl
+        "sitememoria-hmg"
+      );
+      expect(path).toBe("memory/file.png");
+    });
+
+    it("should handle legacy URL with nested paths", () => {
+      const legacyUrl =
+        "https://minio-homolog-api.aguiabranca.com.br/test-bucket/folder1/folder2/file.jpg";
+      const path = extractFilePathFromUrl(
+        legacyUrl,
+        "http://localhost:9000/",
+        "test-bucket"
+      );
+      expect(path).toBe("folder1/folder2/file.jpg");
+    });
   });
 });
 

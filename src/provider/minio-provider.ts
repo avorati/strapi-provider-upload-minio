@@ -14,6 +14,7 @@ import {
   buildHostUrl,
   createFileUrl,
   isFileFromSameBucket,
+  pathnameContainsBucket,
 } from "../utils/url-builder";
 import {
   buildUploadPath,
@@ -236,6 +237,8 @@ export class MinioProvider implements StrapiProvider {
 
   /**
    * Generates a signed URL for a file
+   * This method is more tolerant and will attempt to generate signed URLs for legacy files
+   * even when the endpoint doesn't match exactly, as long as the bucket is detected in the pathname
    */
   public async getSignedUrl(
     file: StrapiFile,
@@ -247,19 +250,70 @@ export class MinioProvider implements StrapiProvider {
       });
     }
 
-    // If file is not from the same bucket, return the original URL
-    if (
-      !isFileFromSameBucket(file.url, this.config.endPoint, this.config.bucket)
-    ) {
+    // Check if URL is already signed (contains query parameters from presigned URL)
+    // If it's already signed, we can return it as-is or regenerate it
+    const isAlreadySigned = file.url.includes("X-Amz-Algorithm") || 
+                            file.url.includes("signature=");
+
+    // Primary check: verify if file is from the same bucket
+    const isFromSameBucket = isFileFromSameBucket(
+      file.url,
+      this.config.endPoint,
+      this.config.bucket
+    );
+
+    // Fallback check: verify if pathname contains the bucket (for legacy URLs)
+    const pathnameHasBucket = pathnameContainsBucket(file.url, this.config.bucket);
+
+    // If file is not from the same bucket and pathname doesn't contain bucket, return original URL
+    if (!isFromSameBucket && !pathnameHasBucket) {
+      this.logger.debug(
+        `[strapi-provider-upload-minio] File URL does not belong to bucket "${this.config.bucket}": ${file.url}`
+      );
+      return { url: file.url };
+    }
+
+    // If URL is already signed and no custom expiry is requested, return as-is
+    // This avoids unnecessary regeneration of signed URLs
+    if (isAlreadySigned && options?.expiresIn === undefined) {
       return { url: file.url };
     }
 
     try {
-      const filePath = extractFilePathFromUrl(
-        file.url,
-        this.hostUrl,
-        this.config.bucket
-      );
+      // Attempt to extract file path - this will work even if hostUrl doesn't match exactly
+      let filePath: string;
+      try {
+        filePath = extractFilePathFromUrl(
+          file.url,
+          this.hostUrl,
+          this.config.bucket
+        );
+      } catch (extractError) {
+        // If extraction fails with hostUrl, try to extract from pathname directly
+        this.logger.debug(
+          `[strapi-provider-upload-minio] Failed to extract path with hostUrl, trying pathname extraction: ${extractError instanceof Error ? extractError.message : String(extractError)}`
+        );
+        
+        try {
+          const urlObj = new URL(file.url);
+          const pathname = urlObj.pathname;
+          
+          // Remove leading slash and bucket from pathname
+          if (pathname.startsWith(`/${this.config.bucket}/`)) {
+            filePath = pathname.substring(`/${this.config.bucket}/`.length);
+          } else if (pathname.startsWith(`/${this.config.bucket}`)) {
+            filePath = pathname.substring(`/${this.config.bucket}`.length).replace(/^\//, "");
+          } else {
+            throw new Error("Could not extract file path from pathname");
+          }
+        } catch (pathnameError) {
+          // If all extraction methods fail, log and return original URL
+          this.logger.warn(
+            `[strapi-provider-upload-minio] Could not extract file path from URL: ${file.url}. Error: ${pathnameError instanceof Error ? pathnameError.message : String(pathnameError)}`
+          );
+          return { url: file.url };
+        }
+      }
 
       // Use custom expiry if provided, otherwise use config default
       const expiry = options?.expiresIn || this.config.expiry;
@@ -293,6 +347,20 @@ export class MinioProvider implements StrapiProvider {
         errorDetails.suggestion = "Check your MinIO access key and secret key permissions for signed URL generation.";
       } else if (errorMessage.includes("NoSuchKey") || errorMessage.includes("not found")) {
         errorDetails.suggestion = "The file may not exist in the bucket.";
+      }
+
+      // Log the error but don't throw - return original URL as fallback for legacy files
+      this.logger.warn(
+        `[strapi-provider-upload-minio] Failed to generate signed URL for file: ${file.url}. Error: ${errorMessage}. Returning original URL as fallback.`
+      );
+
+      // For legacy files, return original URL instead of throwing error
+      // This ensures backward compatibility
+      if (pathnameHasBucket && !isFromSameBucket) {
+        this.logger.debug(
+          `[strapi-provider-upload-minio] Legacy file detected, returning original URL as fallback`
+        );
+        return { url: file.url };
       }
 
       throw new SignedUrlError(errorMessage, errorDetails);

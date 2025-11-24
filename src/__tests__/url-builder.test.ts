@@ -2,6 +2,7 @@ import {
   buildHostUrl,
   createFileUrl,
   isFileFromSameBucket,
+  pathnameContainsBucket,
 } from "../utils/url-builder";
 import { NormalizedConfig } from "../utils/config-validator";
 
@@ -104,6 +105,56 @@ describe("url-builder", () => {
         "test-bucket"
       );
       expect(result).toBe(false);
+    });
+
+    it("should return true for legacy URL with different endpoint but same bucket in pathname", () => {
+      // Legacy URL with different hostname but bucket in pathname
+      const result = isFileFromSameBucket(
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/file.png",
+        "localhost",
+        "sitememoria-hmg"
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should return true for URL with matching bucket even if hostname differs slightly", () => {
+      const result = isFileFromSameBucket(
+        "https://minio-homolog-api.aguiabranca.com.br/test-bucket/file.jpg",
+        "minio-homolog-api",
+        "test-bucket"
+      );
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("pathnameContainsBucket", () => {
+    it("should return true when pathname contains bucket", () => {
+      const result = pathnameContainsBucket(
+        "https://minio-homolog-api.aguiabranca.com.br/sitememoria-hmg/memory/file.png",
+        "sitememoria-hmg"
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should return false when pathname does not contain bucket", () => {
+      const result = pathnameContainsBucket(
+        "https://minio-homolog-api.aguiabranca.com.br/other-bucket/memory/file.png",
+        "sitememoria-hmg"
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should return false for undefined URL", () => {
+      const result = pathnameContainsBucket(undefined, "test-bucket");
+      expect(result).toBe(false);
+    });
+
+    it("should return true when pathname is exactly /bucket", () => {
+      const result = pathnameContainsBucket(
+        "https://localhost:9000/test-bucket",
+        "test-bucket"
+      );
+      expect(result).toBe(true);
     });
   });
 });
