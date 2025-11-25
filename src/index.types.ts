@@ -65,6 +65,9 @@ export interface ProviderOptions {
   requestTimeout?: number | string; // Request timeout in milliseconds (optional, for future use)
   debug?: boolean | string; // Enable verbose debug logging
   rejectUnauthorized?: boolean | string; // Reject unauthorized SSL certificates (default: true). Set to false for self-signed certificates in dev/hmg environments
+  maxRetries?: number | string; // Maximum number of retries for transient errors (default: 3)
+  retryDelay?: number | string; // Delay between retries in milliseconds (default: 1000)
+  keepAlive?: boolean | string; // Enable HTTP keep-alive connections (default: false to avoid proxy/firewall issues)
 }
 
 export interface SignedUrlResponse {

@@ -6,6 +6,8 @@ const DEFAULT_PORT_HTTP = 9000; // Default port for HTTP
 const DEFAULT_PORT_HTTPS = 443; // Default port for HTTPS
 const DEFAULT_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
 const DEFAULT_CONNECT_TIMEOUT = 60000; // 60 seconds in milliseconds
+const DEFAULT_MAX_RETRIES = 3; // Default number of retries for transient errors
+const DEFAULT_RETRY_DELAY = 1000; // Default delay between retries in milliseconds
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
@@ -141,6 +143,9 @@ export interface NormalizedConfig {
   requestTimeout?: number; // Request timeout in milliseconds (optional, for future use)
   debug: boolean; // Enable verbose debug logging
   rejectUnauthorized: boolean; // Reject unauthorized SSL certificates (default: true). Set to false for self-signed certificates
+  maxRetries?: number; // Maximum number of retries for transient errors (default: 3)
+  retryDelay?: number; // Delay between retries in milliseconds (default: 1000)
+  keepAlive?: boolean; // Enable HTTP keep-alive connections (default: false to avoid proxy/firewall issues)
 }
 
 /**
@@ -219,15 +224,17 @@ export function validateAndNormalizeConfig(
     port = defaultPort;
   }
 
-  // Warn about potentially incorrect port configuration
+  // Auto-correct potentially incorrect port configuration
   // Common mistake: useSSL=true with port 9000 (HTTP default)
+  // Automatically adjust to 443 (HTTPS default) to prevent connection errors
   if (useSSL && port === DEFAULT_PORT_HTTP) {
     logger.warn(
-      `[strapi-provider-upload-minio] Warning: SSL is enabled (useSSL=true) but port is ${DEFAULT_PORT_HTTP} (HTTP default). ` +
-      `This may cause connection issues. For HTTPS, consider using port ${DEFAULT_PORT_HTTPS} (default HTTPS port) or the correct HTTPS port for your MinIO server.`
+      `[strapi-provider-upload-minio] Auto-correcting: SSL is enabled but port is ${DEFAULT_PORT_HTTP} (HTTP default). ` +
+      `Automatically using port ${DEFAULT_PORT_HTTPS} (HTTPS default) instead.`
     );
+    port = DEFAULT_PORT_HTTPS;
   }
-  // Also warn about HTTP with port 443 (HTTPS default)
+  // Also warn about HTTP with port 443 (HTTPS default) - less common, just warn
   if (!useSSL && port === DEFAULT_PORT_HTTPS) {
     logger.warn(
       `[strapi-provider-upload-minio] Warning: SSL is disabled (useSSL=false) but port is ${DEFAULT_PORT_HTTPS} (HTTPS default). ` +
@@ -361,6 +368,43 @@ export function validateAndNormalizeConfig(
     }
   }
 
+  // Parse and validate maxRetries
+  let maxRetries: number | undefined;
+  if (options.maxRetries !== undefined) {
+    const parsedRetries = parseNumber(options.maxRetries);
+    if (parsedRetries !== undefined && parsedRetries >= 0) {
+      maxRetries = parsedRetries;
+    } else {
+      logger.warn(
+        `[strapi-provider-upload-minio] Warning: Invalid maxRetries value "${options.maxRetries}". Using default maxRetries ${DEFAULT_MAX_RETRIES}.`
+      );
+    }
+  }
+  if (maxRetries === undefined) {
+    maxRetries = DEFAULT_MAX_RETRIES;
+  }
+
+  // Parse and validate retryDelay
+  let retryDelay: number | undefined;
+  if (options.retryDelay !== undefined) {
+    const parsedDelay = parseNumber(options.retryDelay);
+    if (parsedDelay !== undefined && parsedDelay >= 0) {
+      retryDelay = parsedDelay;
+    } else {
+      logger.warn(
+        `[strapi-provider-upload-minio] Warning: Invalid retryDelay value "${options.retryDelay}". Using default retryDelay ${DEFAULT_RETRY_DELAY}ms.`
+      );
+    }
+  }
+  if (retryDelay === undefined) {
+    retryDelay = DEFAULT_RETRY_DELAY;
+  }
+
+  // Parse and validate keepAlive (default: false to avoid proxy/firewall issues)
+  const keepAlive = options.keepAlive === undefined 
+    ? false 
+    : parseBoolean(options.keepAlive);
+
   const normalizedConfig: NormalizedConfig = {
     endPoint: trimmedEndPoint,
     port,
@@ -374,6 +418,9 @@ export function validateAndNormalizeConfig(
     connectTimeout,
     debug,
     rejectUnauthorized,
+    maxRetries,
+    retryDelay,
+    keepAlive,
   };
 
   if (requestTimeout !== undefined) {

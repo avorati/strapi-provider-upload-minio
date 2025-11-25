@@ -52,7 +52,8 @@ export default {
       provider: '@avorati/strapi-provider-upload-minio',
       providerOptions: {
         host: process.env.MINIO_HOST || process.env.MINIO_ENDPOINT || 'localhost',
-        port: parseInt(process.env.MINIO_PORT || '9000'),
+        port: process.env.MINIO_PORT ? parseInt(process.env.MINIO_PORT) : undefined,
+        // If port is not specified, the provider will automatically use the default port based on useSSL (443 for HTTPS, 9000 for HTTP)
         useSSL: process.env.MINIO_USE_SSL === 'true',
         rejectUnauthorized: process.env.MINIO_REJECT_UNAUTHORIZED !== 'false', // default: true (secure)
         accessKey: process.env.MINIO_ACCESS_KEY,
@@ -138,6 +139,9 @@ await strapi.plugin('upload').provider.upload(file, {
 | `connectTimeout` | number | ❌       | Connection timeout in milliseconds (default: 60000 = 60 seconds) |
 | `requestTimeout` | number | ❌       | Request timeout in milliseconds (optional, for future use) |
 | `debug`          | boolean| ❌       | Enable verbose debug logging (default: false) |
+| `maxRetries`     | number | ❌       | Maximum number of retries for transient errors (default: 3) |
+| `retryDelay`     | number | ❌       | Delay between retries in milliseconds (default: 1000) |
+| `keepAlive`      | boolean| ❌       | Enable HTTP keep-alive connections (default: false to avoid proxy/firewall issues) |
 
 ## 🐳 Docker Compose - MinIO for development
 

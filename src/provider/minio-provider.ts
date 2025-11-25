@@ -92,6 +92,116 @@ export class MinioProvider implements StrapiProvider {
   }
 
   /**
+   * Determines if an error is a transient network error that should be retried
+   */
+  private isTransientError(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorCode = (error as any)?.code;
+
+    // Check for transient network errors
+    const transientErrorCodes = [
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      'ENOTFOUND',
+      'ECONNABORTED',
+      'EPIPE',
+    ];
+
+    const transientErrorMessages = [
+      'timeout',
+      'connection',
+      'network',
+      'socket',
+    ];
+
+    // Check error code
+    if (errorCode && transientErrorCodes.includes(errorCode)) {
+      return true;
+    }
+
+    // Check error message
+    const lowerMessage = errorMessage.toLowerCase();
+    if (transientErrorMessages.some(keyword => lowerMessage.includes(keyword))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Retries an operation with exponential backoff on transient errors
+   */
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    context?: Record<string, unknown>
+  ): Promise<T> {
+    const maxRetries = this.config.maxRetries || 3;
+    const retryDelay = this.config.retryDelay || 1000;
+    const isDebugEnabled = this.logger.isDebugEnabled && this.logger.isDebugEnabled();
+
+    let lastError: unknown;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (isDebugEnabled && attempt > 1) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] Retry attempt ${attempt}/${maxRetries} for ${operationName}`,
+            context ? JSON.stringify(context, null, 2) : undefined
+          );
+        }
+        
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        // Only retry transient errors
+        if (!this.isTransientError(error)) {
+          // Not a transient error, don't retry
+          if (isDebugEnabled) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] ${operationName} failed with non-transient error, not retrying:`,
+              error instanceof Error ? error.message : String(error)
+            );
+          }
+          throw error;
+        }
+
+        // If this is the last attempt, throw the error
+        if (attempt === maxRetries) {
+          if (isDebugEnabled) {
+            this.logger.debug(
+              `[strapi-provider-upload-minio] [DEBUG] ${operationName} failed after ${maxRetries} attempts`
+            );
+          }
+          throw error;
+        }
+
+        // Calculate exponential backoff delay: retryDelay * 2^(attempt-1)
+        const delay = retryDelay * Math.pow(2, attempt - 1);
+        
+        if (isDebugEnabled) {
+          this.logger.debug(
+            `[strapi-provider-upload-minio] [DEBUG] ${operationName} failed with transient error (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`,
+            error instanceof Error ? error.message : String(error)
+          );
+        } else {
+          this.logger.info(
+            `[strapi-provider-upload-minio] ${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`
+          );
+        }
+
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    // This should never be reached, but TypeScript needs it
+    throw lastError;
+  }
+
+  /**
    * Checks if the cached bucket existence result is still valid
    */
   private isBucketCheckCacheValid(): boolean {
@@ -351,77 +461,56 @@ export class MinioProvider implements StrapiProvider {
         );
       }
       
-      // Test credentials before upload by trying to list bucket (quick test)
-      // This helps identify credential issues early
+      // Use retry logic for upload operation to handle transient network errors
       try {
-        if (isDebugEnabled) {
-          this.logger.debug(
-            `[strapi-provider-upload-minio] [DEBUG] Testing credentials with bucketExists check...`
-          );
-        }
-        const bucketExists = await this.client.bucketExists(this.config.bucket);
-        if (isDebugEnabled) {
-          this.logger.debug(
-            `[strapi-provider-upload-minio] [DEBUG] Credentials test passed. Bucket exists: ${bucketExists}`
-          );
-        }
-      } catch (credTestError) {
-        const credErrorMsg = credTestError instanceof Error ? credTestError.message : String(credTestError);
-        const credErrorStack = credTestError instanceof Error ? credTestError.stack : undefined;
-        const credErrorCode = (credTestError as any)?.code;
-        const credErrorSyscall = (credTestError as any)?.syscall;
-        const credErrorHostname = (credTestError as any)?.hostname;
-        
-        console.error(`[MINIO-CREDENTIALS-TEST] Failed before upload:`, credErrorMsg);
-        console.error(`[MINIO-CREDENTIALS-TEST] Error code:`, credErrorCode);
-        console.error(`[MINIO-CREDENTIALS-TEST] Error syscall:`, credErrorSyscall);
-        console.error(`[MINIO-CREDENTIALS-TEST] Error hostname:`, credErrorHostname);
-        if (credErrorStack) {
-          console.error(`[MINIO-CREDENTIALS-TEST] Error stack:`, credErrorStack);
-        }
-        console.error(`[MINIO-CREDENTIALS-TEST] This may indicate credentials/endpoint mismatch, SSL certificate issues, or network connectivity problems!`);
-        // Continue anyway - let putObject fail with more context
-      }
-      
-      try {
-        if (file.size && file.size > 0) {
-          if (isDebugEnabled) {
-            this.logger.debug(
-              `[strapi-provider-upload-minio] [DEBUG] Calling putObject WITH size parameter: ${file.size}`
-            );
+        await this.retryOperation(
+          async () => {
+            if (file.size && file.size > 0) {
+              if (isDebugEnabled) {
+                this.logger.debug(
+                  `[strapi-provider-upload-minio] [DEBUG] Calling putObject WITH size parameter: ${file.size}`
+                );
+              }
+              await this.client.putObject(
+                this.config.bucket,
+                normalizedUploadPath,
+                content,
+                file.size,
+                metadata
+              );
+              if (isDebugEnabled) {
+                this.logger.debug(
+                  `[strapi-provider-upload-minio] [DEBUG] Upload succeeded`
+                );
+              }
+            } else {
+              if (isDebugEnabled) {
+                this.logger.debug(
+                  `[strapi-provider-upload-minio] [DEBUG] Calling putObject WITHOUT size parameter`
+                );
+              }
+              // Don't pass size - MinIO will calculate automatically (like old code)
+              // Cast to any to handle optional size parameter in TypeScript
+              await (this.client.putObject as any)(
+                this.config.bucket,
+                normalizedUploadPath,
+                content,
+                metadata
+              );
+              if (isDebugEnabled) {
+                this.logger.debug(
+                  `[strapi-provider-upload-minio] [DEBUG] Upload succeeded`
+                );
+              }
+            }
+          },
+          'upload',
+          {
+            bucket: this.config.bucket,
+            objectName: normalizedUploadPath,
+            fileSize: file.size,
           }
-          await this.client.putObject(
-            this.config.bucket,
-            normalizedUploadPath,
-            content,
-            file.size,
-            metadata
-          );
-          if (isDebugEnabled) {
-            this.logger.debug(
-              `[strapi-provider-upload-minio] [DEBUG] Upload succeeded`
-            );
-          }
-        } else {
-          if (isDebugEnabled) {
-            this.logger.debug(
-              `[strapi-provider-upload-minio] [DEBUG] Calling putObject WITHOUT size parameter`
-            );
-          }
-          // Don't pass size - MinIO will calculate automatically (like old code)
-          // Cast to any to handle optional size parameter in TypeScript
-          await (this.client.putObject as any)(
-            this.config.bucket,
-            normalizedUploadPath,
-            content,
-            metadata
-          );
-          if (isDebugEnabled) {
-            this.logger.debug(
-              `[strapi-provider-upload-minio] [DEBUG] Upload succeeded`
-            );
-          }
-        }
+        );
 
         // Ensure stream is completely closed after upload to prevent EBUSY errors on Windows
         // This is especially important when multiple uploads happen in parallel
@@ -731,7 +820,15 @@ export class MinioProvider implements StrapiProvider {
         );
       }
       
-      await this.client.removeObject(this.config.bucket, filePath);
+      // Use retry logic for delete operation to handle transient network errors
+      await this.retryOperation(
+        () => this.client.removeObject(this.config.bucket, filePath),
+        'delete',
+        {
+          bucket: this.config.bucket,
+          objectName: filePath,
+        }
+      );
       
       const deleteDuration = Date.now() - deleteStartTime;
       const totalDuration = Date.now() - startTime;

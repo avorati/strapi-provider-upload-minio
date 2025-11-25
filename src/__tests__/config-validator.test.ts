@@ -163,7 +163,7 @@ describe("config-validator", () => {
       consoleSpy.mockRestore();
     });
 
-    it("should warn when useSSL is true but port is 9000 (HTTP default)", () => {
+    it("should auto-correct port to 443 when useSSL is true but port is 9000 (HTTP default)", () => {
       const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
       const config = validateAndNormalizeConfig({
         ...validConfig,
@@ -171,10 +171,10 @@ describe("config-validator", () => {
         port: 9000,
       });
 
-      expect(config.port).toBe(9000);
+      expect(config.port).toBe(443); // Port should be auto-corrected to HTTPS default
       expect(config.useSSL).toBe(true);
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("SSL is enabled (useSSL=true) but port is 9000")
+        expect.stringContaining("Auto-correcting: SSL is enabled but port is 9000")
       );
       consoleSpy.mockRestore();
     });
