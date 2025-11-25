@@ -17,11 +17,14 @@ export function createMinioClient(config: NormalizedConfig): MinioClient {
 
   // Create custom HTTP agent with timeout options if provided
   const connectTimeout = config.connectTimeout || 60000; // Default 60 seconds
+  const keepAlive = config.keepAlive !== undefined ? config.keepAlive : false; // Default: false to avoid proxy/firewall issues
 
   const agentOptions: https.AgentOptions | http.AgentOptions = {
-    keepAlive: true,
+    keepAlive: keepAlive,
     keepAliveMsecs: 1000,
     timeout: connectTimeout,
+    maxSockets: 50, // Maximum number of sockets per host
+    maxFreeSockets: 10, // Maximum number of free sockets per host
   };
 
   if (config.useSSL) {
@@ -49,6 +52,9 @@ export function createMinioClient(config: NormalizedConfig): MinioClient {
           secretKeyLength: config.secretKey?.length,
           accessKeyPrefix: config.accessKey?.substring(0, 8),
           connectTimeout,
+          keepAlive,
+          maxSockets: 50,
+          maxFreeSockets: 10,
           hasTransportAgent: !!clientOptions.transportAgent,
         }, null, 2)
       );
